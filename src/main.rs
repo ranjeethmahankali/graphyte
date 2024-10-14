@@ -1,4 +1,7 @@
-use eframe::{egui, egui_glow, glow};
+use eframe::{
+    egui, egui_glow,
+    glow::{self, HasContext},
+};
 use egui::mutex::Mutex;
 use std::sync::Arc;
 
@@ -35,6 +38,13 @@ impl MyApp {
             .gl
             .as_ref()
             .expect("You need to run eframe with the glow backend");
+        let gl: &glow::Context = gl;
+        unsafe {
+            gl.enable(glow::DEPTH_TEST);
+            gl.enable(glow::BLEND);
+            gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
+            gl.enable(glow::LINE_SMOOTH);
+        }
         Self {
             rotating_triangle: Arc::new(Mutex::new(RotatingTriangle::new(gl))),
             projection: glam::Mat4::perspective_rh_gl(
@@ -131,7 +141,7 @@ impl RotatingTriangle {
                     let shader = gl
                         .create_shader(*shader_type)
                         .expect("Cannot create shader");
-                    gl.shader_source(shader, &shader_source);
+                    gl.shader_source(shader, shader_source);
                     gl.compile_shader(shader);
                     assert!(
                         gl.get_shader_compile_status(shader),
@@ -180,6 +190,8 @@ impl RotatingTriangle {
                 &mvp.to_cols_array(),
             );
             gl.bind_vertex_array(Some(self.vertex_array));
+            gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL);
+            gl.disable(glow::POLYGON_OFFSET_FILL);
             gl.draw_arrays(glow::TRIANGLES, 0, 9);
         }
     }
