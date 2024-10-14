@@ -16,10 +16,17 @@ fn main() -> eframe::Result {
     )
 }
 
+const VIEWPORT_WIDTH: f32 = 1280.0;
+const VIEWPORT_HEIGHT: f32 = 768.0;
+const FOVY: f32 = 0.9;
+const NEAR: f32 = 0.01;
+const FAR: f32 = 100.0;
+
 struct MyApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
     rotating_triangle: Arc<Mutex<RotatingTriangle>>,
-    angle: f32,
+    projection: glam::Mat4,
+    view: glam::Mat4,
 }
 
 impl MyApp {
@@ -30,8 +37,22 @@ impl MyApp {
             .expect("You need to run eframe with the glow backend");
         Self {
             rotating_triangle: Arc::new(Mutex::new(RotatingTriangle::new(gl))),
-            angle: 0.0,
+            projection: glam::Mat4::perspective_rh_gl(
+                FOVY,
+                VIEWPORT_WIDTH / VIEWPORT_HEIGHT,
+                NEAR,
+                FAR,
+            ),
+            view: glam::Mat4::look_at_rh(
+                glam::vec3(1.0, 1.0, 1.0),
+                glam::vec3(0.0, 0.0, 0.0),
+                glam::vec3(0.0, 0.0, 1.0),
+            ),
         }
+    }
+
+    fn mvp_mat(&self) -> glam::Mat4 {
+        self.projection * self.view
     }
 }
 
@@ -60,16 +81,21 @@ impl eframe::App for MyApp {
 
 impl MyApp {
     fn custom_painting(&mut self, ui: &mut egui::Ui) {
-        let (rect, response) =
-            ui.allocate_exact_size(egui::Vec2::splat(300.0), egui::Sense::drag());
-        self.angle += response.drag_motion().x * 0.01;
+        let (rect, response) = ui.allocate_exact_size(
+            egui::Vec2::new(VIEWPORT_WIDTH, VIEWPORT_HEIGHT),
+            egui::Sense::drag(),
+        );
+        const FACTOR: f32 = 0.01;
+        self.view = self.view
+            * glam::Mat4::from_rotation_x(response.drag_motion().x * FACTOR)
+            * glam::Mat4::from_rotation_y(response.drag_motion().y * FACTOR);
+        let mvp = self.mvp_mat();
         // Clone locals so we can move them into the paint callback:
-        let angle = self.angle;
         let rotating_triangle = self.rotating_triangle.clone();
         let callback = egui::PaintCallback {
             rect,
             callback: std::sync::Arc::new(egui_glow::CallbackFn::new(move |_info, painter| {
-                rotating_triangle.lock().paint(painter.gl(), angle);
+                rotating_triangle.lock().paint(painter.gl(), mvp);
             })),
         };
         ui.painter().add(callback);
@@ -104,11 +130,10 @@ impl RotatingTriangle {
                         vec4(0.0, 0.0, 1.0, 1.0)
                     );
                     out vec4 v_color;
-                    uniform float u_angle;
+                    uniform mat4 u_mvp;
                     void main() {
                         v_color = colors[gl_VertexID];
-                        gl_Position = vec4(verts[gl_VertexID], 0.0, 1.0);
-                        gl_Position.x *= cos(u_angle);
+                        gl_Position = u_mvp * vec4(verts[gl_VertexID], 0.0, 1.0);
                     }
                 "#,
                 r#"
@@ -169,13 +194,14 @@ impl RotatingTriangle {
         }
     }
 
-    fn paint(&self, gl: &glow::Context, angle: f32) {
+    fn paint(&self, gl: &glow::Context, mvp: glam::Mat4) {
         use glow::HasContext as _;
         unsafe {
             gl.use_program(Some(self.program));
-            gl.uniform_1_f32(
-                gl.get_uniform_location(self.program, "u_angle").as_ref(),
-                angle,
+            gl.uniform_matrix_4_f32_slice(
+                gl.get_uniform_location(self.program, "u_mvp").as_ref(),
+                false,
+                &mvp.to_cols_array(),
             );
             gl.bind_vertex_array(Some(self.vertex_array));
             gl.draw_arrays(glow::TRIANGLES, 0, 3);
