@@ -85,10 +85,15 @@ impl MyApp {
             egui::Vec2::new(VIEWPORT_WIDTH, VIEWPORT_HEIGHT),
             egui::Sense::drag(),
         );
-        const FACTOR: f32 = 0.01;
-        self.view = self.view
-            * glam::Mat4::from_rotation_x(response.drag_motion().x * FACTOR)
-            * glam::Mat4::from_rotation_y(response.drag_motion().y * FACTOR);
+        const FACTOR: f32 = 0.001;
+        // let rot = glam::Mat4::from_rotation_x(response.drag_motion().x * FACTOR)
+        //     * glam::Mat4::from_rotation_y(response.drag_motion().y * FACTOR);
+        let inv = self.view.inverse();
+        let x = inv * glam::vec4(0., 1., 0., 0.);
+        let y = inv * glam::vec4(1., 0., 0., 0.);
+        let rot = glam::Quat::from_axis_angle(x.truncate(), response.drag_motion().x * FACTOR)
+            * glam::Quat::from_axis_angle(y.truncate(), response.drag_motion().y * FACTOR);
+        self.view = self.view * glam::Mat4::from_quat(rot);
         let mvp = self.mvp_mat();
         // Clone locals so we can move them into the paint callback:
         let rotating_triangle = self.rotating_triangle.clone();
@@ -110,40 +115,11 @@ struct RotatingTriangle {
 impl RotatingTriangle {
     fn new(gl: &glow::Context) -> Self {
         use glow::HasContext as _;
-        let shader_version = if cfg!(target_arch = "wasm32") {
-            "#version 300 es"
-        } else {
-            "#version 330"
-        };
         unsafe {
             let program = gl.create_program().expect("Cannot create program");
             let (vertex_shader_source, fragment_shader_source) = (
-                r#"
-                    const vec2 verts[3] = vec2[3](
-                        vec2(0.0, 1.0),
-                        vec2(-1.0, -1.0),
-                        vec2(1.0, -1.0)
-                    );
-                    const vec4 colors[3] = vec4[3](
-                        vec4(1.0, 0.0, 0.0, 1.0),
-                        vec4(0.0, 1.0, 0.0, 1.0),
-                        vec4(0.0, 0.0, 1.0, 1.0)
-                    );
-                    out vec4 v_color;
-                    uniform mat4 u_mvp;
-                    void main() {
-                        v_color = colors[gl_VertexID];
-                        gl_Position = u_mvp * vec4(verts[gl_VertexID], 0.0, 1.0);
-                    }
-                "#,
-                r#"
-                    precision mediump float;
-                    in vec4 v_color;
-                    out vec4 out_color;
-                    void main() {
-                        out_color = v_color;
-                    }
-                "#,
+                include_str!("shaders/vertex.glsl"),
+                include_str!("shaders/fragment.glsl"),
             );
             let shader_sources = [
                 (glow::VERTEX_SHADER, vertex_shader_source),
@@ -155,7 +131,7 @@ impl RotatingTriangle {
                     let shader = gl
                         .create_shader(*shader_type)
                         .expect("Cannot create shader");
-                    gl.shader_source(shader, &format!("{shader_version}\n{shader_source}"));
+                    gl.shader_source(shader, &shader_source);
                     gl.compile_shader(shader);
                     assert!(
                         gl.get_shader_compile_status(shader),
@@ -204,7 +180,7 @@ impl RotatingTriangle {
                 &mvp.to_cols_array(),
             );
             gl.bind_vertex_array(Some(self.vertex_array));
-            gl.draw_arrays(glow::TRIANGLES, 0, 3);
+            gl.draw_arrays(glow::TRIANGLES, 0, 9);
         }
     }
 }
