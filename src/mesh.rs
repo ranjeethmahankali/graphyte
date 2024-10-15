@@ -24,18 +24,71 @@ struct Mesh {
     points: Property<glam::Vec3>,
 }
 
+struct PropertyContainer {
+    props: Vec<Box<dyn TProperty>>,
+}
+
+impl PropertyContainer {
+    fn reserve(&mut self, n: usize) {
+        for prop in self.props.iter_mut() {
+            prop.reserve(n);
+        }
+    }
+
+    fn resize(&mut self, n: usize) {
+        for prop in self.props.iter_mut() {
+            prop.resize(n);
+        }
+    }
+
+    fn clear(&mut self) {
+        for prop in self.props.iter_mut() {
+            prop.clear();
+        }
+    }
+
+    fn push(&mut self) {
+        for prop in self.props.iter_mut() {
+            prop.push();
+        }
+    }
+
+    fn swap(&mut self, i: usize, j: usize) {
+        for prop in self.props.iter_mut() {
+            prop.swap(i, j);
+        }
+    }
+
+    fn copy(&mut self, src: usize, dst: usize) {
+        for prop in self.props.iter_mut() {
+            prop.copy(src, dst);
+        }
+    }
+
+    fn len(&self) -> usize {
+        let first = match self.props.first() {
+            Some(first) => first.len(),
+            None => return 0,
+        };
+        for prop in self.props.iter().skip(1) {
+            assert_eq!(first, prop.len());
+        }
+        return first;
+    }
+}
+
 trait TPropData: Default + Clone + Copy {}
 
 impl TPropData for glam::Vec3 {}
 
-trait TProperty<T: TPropData> {
+trait TProperty {
     fn reserve(&mut self, n: usize);
 
     fn resize(&mut self, n: usize);
 
     fn clear(&mut self);
 
-    fn push(&mut self, val: T);
+    fn push(&mut self);
 
     fn swap(&mut self, i: usize, j: usize);
 
@@ -56,7 +109,7 @@ impl<T: TPropData> Default for Property<T> {
     }
 }
 
-impl<T: TPropData> TProperty<T> for Property<T> {
+impl<T: TPropData> TProperty for Property<T> {
     fn reserve(&mut self, n: usize) {
         self.data.reserve(n);
     }
@@ -69,8 +122,8 @@ impl<T: TPropData> TProperty<T> for Property<T> {
         self.data.clear();
     }
 
-    fn push(&mut self, val: T) {
-        self.data.push(val);
+    fn push(&mut self) {
+        self.data.push(T::default());
     }
 
     fn swap(&mut self, i: usize, j: usize) {
