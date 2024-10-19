@@ -149,7 +149,7 @@ impl<T: TPropData> Property<T> {
     }
 
     fn generic_ref(&self) -> Box<dyn GenericProperty> {
-        Box::new(WeakProperty {
+        Box::new(PropertyRef {
             data: Arc::downgrade(&self.data),
         })
     }
@@ -163,17 +163,17 @@ impl<T: TPropData> Default for Property<T> {
     }
 }
 
-struct WeakProperty<T: TPropData> {
+struct PropertyRef<T: TPropData> {
     data: Weak<RwLock<Vec<T>>>,
 }
 
-impl<T: TPropData> WeakProperty<T> {
+impl<T: TPropData> PropertyRef<T> {
     fn upgrade(&self) -> Result<Arc<RwLock<Vec<T>>>, Error> {
         self.data.upgrade().ok_or(Error::PropertyDoesNotExist)
     }
 }
 
-impl<T: TPropData> GenericProperty for WeakProperty<T> {
+impl<T: TPropData> GenericProperty for PropertyRef<T> {
     fn reserve(&mut self, n: usize) -> Result<(), Error> {
         self.upgrade()?
             .write()
