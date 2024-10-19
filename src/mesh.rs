@@ -28,6 +28,22 @@ struct Mesh {
     edges: Vec<Edge>,
     faces: Vec<Face>,
     points: Property<glam::Vec3>,
+    vprops: PropertyContainer,
+}
+
+impl Mesh {
+    fn new() -> Self {
+        let points = Property::<glam::Vec3>::new();
+        let mut vprops = PropertyContainer::new();
+        vprops.add_property(points.make_ref());
+        Mesh {
+            vertices: Vec::new(),
+            edges: Vec::new(),
+            faces: Vec::new(),
+            points,
+            vprops,
+        }
+    }
 }
 
 struct PropertyContainer {
@@ -35,6 +51,15 @@ struct PropertyContainer {
 }
 
 impl PropertyContainer {
+    fn new() -> Self {
+        PropertyContainer { props: Vec::new() }
+    }
+
+    fn add_property(&mut self, prop: Box<dyn TProperty>) {
+        todo!()
+        // self.props.push(Box::new(prop))
+    }
+
     fn reserve(&mut self, n: usize) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
             prop.reserve(n)?;
@@ -89,7 +114,8 @@ impl PropertyContainer {
     }
 }
 
-trait TPropData: Default + Clone + Copy {}
+// 'static lifetime enforces the data stored inside properties is fully owned.
+trait TPropData: Default + Clone + Copy + 'static {}
 
 impl TPropData for glam::Vec3 {}
 
@@ -111,6 +137,20 @@ trait TProperty {
 
 struct Property<T: TPropData> {
     data: Arc<RwLock<Vec<T>>>,
+}
+
+impl<T: TPropData> Property<T> {
+    fn new() -> Self {
+        Property {
+            data: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    fn make_ref(&self) -> Box<dyn TProperty> {
+        Box::new(Property {
+            data: self.data.clone(),
+        })
+    }
 }
 
 impl<T: TPropData> Default for Property<T> {
