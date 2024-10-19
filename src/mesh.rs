@@ -1,3 +1,9 @@
+use std::sync::{Arc, RwLock};
+
+enum Error {
+    SyncFailed,
+}
+
 struct Vertex {
     halfedge: Option<u32>,
 }
@@ -29,51 +35,57 @@ struct PropertyContainer {
 }
 
 impl PropertyContainer {
-    fn reserve(&mut self, n: usize) {
+    fn reserve(&mut self, n: usize) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
-            prop.reserve(n);
+            prop.reserve(n)?;
         }
+        return Ok(());
     }
 
-    fn resize(&mut self, n: usize) {
+    fn resize(&mut self, n: usize) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
-            prop.resize(n);
+            prop.resize(n)?;
         }
+        return Ok(());
     }
 
-    fn clear(&mut self) {
+    fn clear(&mut self) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
-            prop.clear();
+            prop.clear()?;
         }
+        return Ok(());
     }
 
-    fn push(&mut self) {
+    fn push(&mut self) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
-            prop.push();
+            prop.push()?;
         }
+        return Ok(());
     }
 
-    fn swap(&mut self, i: usize, j: usize) {
+    fn swap(&mut self, i: usize, j: usize) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
-            prop.swap(i, j);
+            prop.swap(i, j)?;
         }
+        return Ok(());
     }
 
-    fn copy(&mut self, src: usize, dst: usize) {
+    fn copy(&mut self, src: usize, dst: usize) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
-            prop.copy(src, dst);
+            prop.copy(src, dst)?;
         }
+        return Ok(());
     }
 
-    fn len(&self) -> usize {
+    fn len(&self) -> Result<usize, Error> {
         let first = match self.props.first() {
-            Some(first) => first.len(),
-            None => return 0,
+            Some(first) => first.len()?,
+            None => return Ok(0),
         };
         for prop in self.props.iter().skip(1) {
-            assert_eq!(first, prop.len());
+            assert_eq!(first, prop.len()?);
         }
-        return first;
+        return Ok(first);
     }
 }
 
@@ -82,23 +94,23 @@ trait TPropData: Default + Clone + Copy {}
 impl TPropData for glam::Vec3 {}
 
 trait TProperty {
-    fn reserve(&mut self, n: usize);
+    fn reserve(&mut self, n: usize) -> Result<(), Error>;
 
-    fn resize(&mut self, n: usize);
+    fn resize(&mut self, n: usize) -> Result<(), Error>;
 
-    fn clear(&mut self);
+    fn clear(&mut self) -> Result<(), Error>;
 
-    fn push(&mut self);
+    fn push(&mut self) -> Result<(), Error>;
 
-    fn swap(&mut self, i: usize, j: usize);
+    fn swap(&mut self, i: usize, j: usize) -> Result<(), Error>;
 
-    fn copy(&mut self, src: usize, dst: usize);
+    fn copy(&mut self, src: usize, dst: usize) -> Result<(), Error>;
 
-    fn len(&self) -> usize;
+    fn len(&self) -> Result<usize, Error>;
 }
 
 struct Property<T: TPropData> {
-    data: Vec<T>,
+    data: Arc<RwLock<Vec<T>>>,
 }
 
 impl<T: TPropData> Default for Property<T> {
@@ -110,31 +122,46 @@ impl<T: TPropData> Default for Property<T> {
 }
 
 impl<T: TPropData> TProperty for Property<T> {
-    fn reserve(&mut self, n: usize) {
-        self.data.reserve(n);
+    fn reserve(&mut self, n: usize) -> Result<(), Error> {
+        self.data.write().map_err(|_| Error::SyncFailed)?.reserve(n); // reserve memory.
+        return Ok(());
     }
 
-    fn resize(&mut self, n: usize) {
-        self.data.resize(n, T::default());
+    fn resize(&mut self, n: usize) -> Result<(), Error> {
+        self.data
+            .write()
+            .map_err(|_| Error::SyncFailed)?
+            .resize(n, T::default());
+        return Ok(());
     }
 
-    fn clear(&mut self) {
-        self.data.clear();
+    fn clear(&mut self) -> Result<(), Error> {
+        self.data.write().map_err(|_| Error::SyncFailed)?.clear();
+        return Ok(());
     }
 
-    fn push(&mut self) {
-        self.data.push(T::default());
+    fn push(&mut self) -> Result<(), Error> {
+        self.data
+            .write()
+            .map_err(|_| Error::SyncFailed)?
+            .push(T::default());
+        return Ok(());
     }
 
-    fn swap(&mut self, i: usize, j: usize) {
-        self.data.swap(i, j);
+    fn swap(&mut self, i: usize, j: usize) -> Result<(), Error> {
+        self.data.write().map_err(|_| Error::SyncFailed)?.swap(i, j);
+        return Ok(());
     }
 
-    fn copy(&mut self, src: usize, dst: usize) {
-        self.data.copy_within(src..(src + 1), dst);
+    fn copy(&mut self, src: usize, dst: usize) -> Result<(), Error> {
+        self.data
+            .write()
+            .map_err(|_| Error::SyncFailed)?
+            .copy_within(src..(src + 1), dst);
+        return Ok(());
     }
 
-    fn len(&self) -> usize {
-        self.data.len()
+    fn len(&self) -> Result<usize, Error> {
+        Ok(self.data.read().map_err(|_| Error::SyncFailed)?.len())
     }
 }
