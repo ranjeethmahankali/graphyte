@@ -1,7 +1,9 @@
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, RwLock, Weak};
 
 enum Error {
-    SyncFailed,
+    ReadPropertyFailed,
+    WriteToPropertyFailed,
+    PropertyDoesNotExist,
 }
 
 struct Vertex {
@@ -35,7 +37,7 @@ impl Mesh {
     fn new() -> Self {
         let points = Property::<glam::Vec3>::new();
         let mut vprops = PropertyContainer::new();
-        vprops.add_property(points.make_ref());
+        vprops.add_property(points.generic_ref());
         Mesh {
             vertices: Vec::new(),
             edges: Vec::new(),
@@ -47,7 +49,7 @@ impl Mesh {
 }
 
 struct PropertyContainer {
-    props: Vec<Box<dyn TProperty>>,
+    props: Vec<Box<dyn GenericProperty>>,
 }
 
 impl PropertyContainer {
@@ -55,9 +57,8 @@ impl PropertyContainer {
         PropertyContainer { props: Vec::new() }
     }
 
-    fn add_property(&mut self, prop: Box<dyn TProperty>) {
-        todo!()
-        // self.props.push(Box::new(prop))
+    fn add_property(&mut self, prop: Box<dyn GenericProperty>) {
+        self.props.push(prop);
     }
 
     fn reserve(&mut self, n: usize) -> Result<(), Error> {
@@ -119,7 +120,7 @@ trait TPropData: Default + Clone + Copy + 'static {}
 
 impl TPropData for glam::Vec3 {}
 
-trait TProperty {
+trait GenericProperty {
     fn reserve(&mut self, n: usize) -> Result<(), Error>;
 
     fn resize(&mut self, n: usize) -> Result<(), Error>;
@@ -146,9 +147,9 @@ impl<T: TPropData> Property<T> {
         }
     }
 
-    fn make_ref(&self) -> Box<dyn TProperty> {
-        Box::new(Property {
-            data: self.data.clone(),
+    fn generic_ref(&self) -> Box<dyn GenericProperty> {
+        Box::new(WeakProperty {
+            data: Arc::downgrade(&self.data),
         })
     }
 }
@@ -161,47 +162,70 @@ impl<T: TPropData> Default for Property<T> {
     }
 }
 
-impl<T: TPropData> TProperty for Property<T> {
+struct WeakProperty<T: TPropData> {
+    data: Weak<RwLock<Vec<T>>>,
+}
+
+impl<T: TPropData> WeakProperty<T> {
+    fn upgrade(&self) -> Result<Arc<RwLock<Vec<T>>>, Error> {
+        self.data.upgrade().ok_or(Error::PropertyDoesNotExist)
+    }
+}
+
+impl<T: TPropData> GenericProperty for WeakProperty<T> {
     fn reserve(&mut self, n: usize) -> Result<(), Error> {
-        self.data.write().map_err(|_| Error::SyncFailed)?.reserve(n); // reserve memory.
+        self.upgrade()?
+            .write()
+            .map_err(|_| Error::WriteToPropertyFailed)?
+            .reserve(n); // reserve memory.
         return Ok(());
     }
 
     fn resize(&mut self, n: usize) -> Result<(), Error> {
-        self.data
+        self.upgrade()?
             .write()
-            .map_err(|_| Error::SyncFailed)?
+            .map_err(|_| Error::WriteToPropertyFailed)?
             .resize(n, T::default());
         return Ok(());
     }
 
     fn clear(&mut self) -> Result<(), Error> {
-        self.data.write().map_err(|_| Error::SyncFailed)?.clear();
+        self.upgrade()?
+            .write()
+            .map_err(|_| Error::WriteToPropertyFailed)?
+            .clear();
         return Ok(());
     }
 
     fn push(&mut self) -> Result<(), Error> {
-        self.data
+        self.upgrade()?
             .write()
-            .map_err(|_| Error::SyncFailed)?
+            .map_err(|_| Error::WriteToPropertyFailed)?
             .push(T::default());
         return Ok(());
     }
 
     fn swap(&mut self, i: usize, j: usize) -> Result<(), Error> {
-        self.data.write().map_err(|_| Error::SyncFailed)?.swap(i, j);
+        self.upgrade()?
+            .write()
+            .map_err(|_| Error::WriteToPropertyFailed)?
+            .swap(i, j);
         return Ok(());
     }
 
     fn copy(&mut self, src: usize, dst: usize) -> Result<(), Error> {
-        self.data
+        self.upgrade()?
             .write()
-            .map_err(|_| Error::SyncFailed)?
+            .map_err(|_| Error::WriteToPropertyFailed)?
             .copy_within(src..(src + 1), dst);
         return Ok(());
     }
 
     fn len(&self) -> Result<usize, Error> {
-        Ok(self.data.read().map_err(|_| Error::SyncFailed)?.len())
+        Ok(self
+            .upgrade()?
+            .read()
+            .map_err(|_| Error::ReadPropertyFailed)?
+            .len())
     }
 }
