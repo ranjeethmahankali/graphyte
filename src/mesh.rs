@@ -46,6 +46,19 @@ impl Mesh {
             vprops,
         }
     }
+
+    fn with_capacity(nverts: usize, nedges: usize, nfaces: usize) -> Self {
+        let points = Property::<glam::Vec3>::with_capacity(nverts);
+        let mut vprops = PropertyContainer::new();
+        vprops.push_property(points.generic_ref());
+        Mesh {
+            vertices: Vec::with_capacity(nverts),
+            edges: Vec::with_capacity(nedges),
+            faces: Vec::with_capacity(nfaces),
+            points,
+            vprops,
+        }
+    }
 }
 
 struct PropertyContainer {
@@ -145,6 +158,12 @@ impl<T: TPropData> Property<T> {
     fn new() -> Self {
         Property {
             data: Arc::new(RwLock::new(Vec::new())),
+        }
+    }
+
+    fn with_capacity(n: usize) -> Self {
+        Property {
+            data: Arc::new(RwLock::new(Vec::with_capacity(n))),
         }
     }
 
