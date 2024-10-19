@@ -37,7 +37,7 @@ impl Mesh {
     fn new() -> Self {
         let points = Property::<glam::Vec3>::new();
         let mut vprops = PropertyContainer::new();
-        vprops.add_property(points.generic_ref());
+        vprops.push_property(points.generic_ref());
         Mesh {
             vertices: Vec::new(),
             edges: Vec::new(),
@@ -57,7 +57,7 @@ impl PropertyContainer {
         PropertyContainer { props: Vec::new() }
     }
 
-    fn add_property(&mut self, prop: Box<dyn GenericProperty>) {
+    fn push_property(&mut self, prop: Box<dyn GenericProperty>) {
         self.props.push(prop);
     }
 
@@ -82,7 +82,7 @@ impl PropertyContainer {
         return Ok(());
     }
 
-    fn push(&mut self) -> Result<(), Error> {
+    fn push_value(&mut self) -> Result<(), Error> {
         for prop in self.props.iter_mut() {
             prop.push()?;
         }
@@ -115,7 +115,8 @@ impl PropertyContainer {
     }
 }
 
-// 'static lifetime enforces the data stored inside properties is fully owned.
+// 'static lifetime enforces the data stored inside properties is fully owned
+// and doesn't contain any weird references.
 trait TPropData: Default + Clone + Copy + 'static {}
 
 impl TPropData for glam::Vec3 {}
