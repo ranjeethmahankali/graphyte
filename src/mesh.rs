@@ -1,7 +1,4 @@
-use std::{
-    cell::RefCell,
-    rc::{Rc, Weak},
-};
+use std::sync::{Arc, RwLock, Weak};
 
 enum Error {
     ReadPropertyFailed,
@@ -177,31 +174,31 @@ trait GenericProperty {
 }
 
 struct Property<T: TPropData> {
-    data: Rc<RefCell<Vec<T>>>,
+    data: Arc<RwLock<Vec<T>>>,
 }
 
 impl<T: TPropData> Property<T> {
     fn new() -> Self {
         Property {
-            data: Rc::new(RefCell::new(Vec::new())),
+            data: Arc::new(RwLock::new(Vec::new())),
         }
     }
 
     fn with_capacity(n: usize) -> Self {
         Property {
-            data: Rc::new(RefCell::new(Vec::with_capacity(n))),
+            data: Arc::new(RwLock::new(Vec::with_capacity(n))),
         }
     }
 
     fn generic_ref(&self) -> Box<dyn GenericProperty> {
         Box::new(PropertyRef {
-            data: Rc::downgrade(&self.data),
+            data: Arc::downgrade(&self.data),
         })
     }
 
     fn get(&self, i: u32) -> Result<T, Error> {
         self.data
-            .try_borrow()
+            .read()
             .map_err(|_| Error::ReadPropertyFailed)?
             .get(i as usize)
             .ok_or(Error::ReadPropertyFailed)
@@ -211,7 +208,7 @@ impl<T: TPropData> Property<T> {
     fn set(&mut self, i: u32, val: T) -> Result<(), Error> {
         let mut buf = self
             .data
-            .try_borrow_mut()
+            .write()
             .map_err(|_| Error::WriteToPropertyFailed)?;
         buf[i as usize] = val;
         return Ok(());
@@ -227,11 +224,11 @@ impl<T: TPropData> Default for Property<T> {
 }
 
 struct PropertyRef<T: TPropData> {
-    data: Weak<RefCell<Vec<T>>>,
+    data: Weak<RwLock<Vec<T>>>,
 }
 
 impl<T: TPropData> PropertyRef<T> {
-    fn upgrade(&self) -> Result<Rc<RefCell<Vec<T>>>, Error> {
+    fn upgrade(&self) -> Result<Arc<RwLock<Vec<T>>>, Error> {
         self.data.upgrade().ok_or(Error::PropertyDoesNotExist)
     }
 }
@@ -239,7 +236,7 @@ impl<T: TPropData> PropertyRef<T> {
 impl<T: TPropData> GenericProperty for PropertyRef<T> {
     fn reserve(&mut self, n: usize) -> Result<(), Error> {
         self.upgrade()?
-            .try_borrow_mut()
+            .write()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .reserve(n); // reserve memory.
         return Ok(());
@@ -247,7 +244,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn resize(&mut self, n: usize) -> Result<(), Error> {
         self.upgrade()?
-            .try_borrow_mut()
+            .write()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .resize(n, T::default());
         return Ok(());
@@ -255,7 +252,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn clear(&mut self) -> Result<(), Error> {
         self.upgrade()?
-            .try_borrow_mut()
+            .write()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .clear();
         return Ok(());
@@ -263,7 +260,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn push(&mut self) -> Result<(), Error> {
         self.upgrade()?
-            .try_borrow_mut()
+            .write()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .push(T::default());
         return Ok(());
@@ -271,7 +268,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn swap(&mut self, i: usize, j: usize) -> Result<(), Error> {
         self.upgrade()?
-            .try_borrow_mut()
+            .write()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .swap(i, j);
         return Ok(());
@@ -279,7 +276,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn copy(&mut self, src: usize, dst: usize) -> Result<(), Error> {
         self.upgrade()?
-            .try_borrow_mut()
+            .write()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .copy_within(src..(src + 1), dst);
         return Ok(());
@@ -288,7 +285,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
     fn len(&self) -> Result<usize, Error> {
         Ok(self
             .upgrade()?
-            .try_borrow()
+            .read()
             .map_err(|_| Error::ReadPropertyFailed)?
             .len())
     }
