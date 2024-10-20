@@ -1,4 +1,7 @@
-use std::sync::{Arc, RwLock, Weak};
+use std::{
+    cell::RefCell,
+    rc::{Rc, Weak},
+};
 
 enum Error {
     ReadPropertyFailed,
@@ -25,7 +28,7 @@ struct Face {
     halfedge: u32,
 }
 
-struct Mesh {
+pub struct Mesh {
     vertices: Vec<Vertex>,
     edges: Vec<Edge>,
     faces: Vec<Face>,
@@ -34,7 +37,7 @@ struct Mesh {
 }
 
 impl Mesh {
-    fn new() -> Self {
+    pub fn new() -> Self {
         let points = Property::<glam::Vec3>::new();
         let mut vprops = PropertyContainer::new();
         vprops.push_property(points.generic_ref());
@@ -47,7 +50,7 @@ impl Mesh {
         }
     }
 
-    fn with_capacity(nverts: usize, nedges: usize, nfaces: usize) -> Self {
+    pub fn with_capacity(nverts: usize, nedges: usize, nfaces: usize) -> Self {
         let points = Property::<glam::Vec3>::with_capacity(nverts);
         let mut vprops = PropertyContainer::new();
         vprops.push_property(points.generic_ref());
@@ -58,6 +61,29 @@ impl Mesh {
             points,
             vprops,
         }
+    }
+
+    pub fn halfedge(&self, h: u32) -> &Halfedge {
+        &self.edges[(h << 1) as usize].halfedges[(h & 1) as usize]
+    }
+
+    pub fn is_boundary_vertex(&self, v: u32) -> bool {
+        match self.vertices[v as usize].halfedge {
+            Some(h) => self.halfedge(h).face.is_some(),
+            None => true,
+        }
+    }
+
+    pub fn add_vertex(&mut self, pos: glam::Vec3) -> Result<u32, Error> {
+        let vi = self.vertices.len() as u32;
+        self.vprops.push_value()?;
+        self.points.set(vi, pos)?;
+        return Ok(vi);
+    }
+
+    pub fn add_face(&mut self, v0: u32, v1: u32, v2: u32) -> u32 {
+        let fi = self.faces.len();
+        todo!();
     }
 }
 
@@ -151,26 +177,44 @@ trait GenericProperty {
 }
 
 struct Property<T: TPropData> {
-    data: Arc<RwLock<Vec<T>>>,
+    data: Rc<RefCell<Vec<T>>>,
 }
 
 impl<T: TPropData> Property<T> {
     fn new() -> Self {
         Property {
-            data: Arc::new(RwLock::new(Vec::new())),
+            data: Rc::new(RefCell::new(Vec::new())),
         }
     }
 
     fn with_capacity(n: usize) -> Self {
         Property {
-            data: Arc::new(RwLock::new(Vec::with_capacity(n))),
+            data: Rc::new(RefCell::new(Vec::with_capacity(n))),
         }
     }
 
     fn generic_ref(&self) -> Box<dyn GenericProperty> {
         Box::new(PropertyRef {
-            data: Arc::downgrade(&self.data),
+            data: Rc::downgrade(&self.data),
         })
+    }
+
+    fn get(&self, i: u32) -> Result<T, Error> {
+        self.data
+            .try_borrow()
+            .map_err(|_| Error::ReadPropertyFailed)?
+            .get(i as usize)
+            .ok_or(Error::ReadPropertyFailed)
+            .copied()
+    }
+
+    fn set(&mut self, i: u32, val: T) -> Result<(), Error> {
+        let mut buf = self
+            .data
+            .try_borrow_mut()
+            .map_err(|_| Error::WriteToPropertyFailed)?;
+        buf[i as usize] = val;
+        return Ok(());
     }
 }
 
@@ -183,11 +227,11 @@ impl<T: TPropData> Default for Property<T> {
 }
 
 struct PropertyRef<T: TPropData> {
-    data: Weak<RwLock<Vec<T>>>,
+    data: Weak<RefCell<Vec<T>>>,
 }
 
 impl<T: TPropData> PropertyRef<T> {
-    fn upgrade(&self) -> Result<Arc<RwLock<Vec<T>>>, Error> {
+    fn upgrade(&self) -> Result<Rc<RefCell<Vec<T>>>, Error> {
         self.data.upgrade().ok_or(Error::PropertyDoesNotExist)
     }
 }
@@ -195,7 +239,7 @@ impl<T: TPropData> PropertyRef<T> {
 impl<T: TPropData> GenericProperty for PropertyRef<T> {
     fn reserve(&mut self, n: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
+            .try_borrow_mut()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .reserve(n); // reserve memory.
         return Ok(());
@@ -203,7 +247,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn resize(&mut self, n: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
+            .try_borrow_mut()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .resize(n, T::default());
         return Ok(());
@@ -211,7 +255,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn clear(&mut self) -> Result<(), Error> {
         self.upgrade()?
-            .write()
+            .try_borrow_mut()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .clear();
         return Ok(());
@@ -219,7 +263,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn push(&mut self) -> Result<(), Error> {
         self.upgrade()?
-            .write()
+            .try_borrow_mut()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .push(T::default());
         return Ok(());
@@ -227,7 +271,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn swap(&mut self, i: usize, j: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
+            .try_borrow_mut()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .swap(i, j);
         return Ok(());
@@ -235,7 +279,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
 
     fn copy(&mut self, src: usize, dst: usize) -> Result<(), Error> {
         self.upgrade()?
-            .write()
+            .try_borrow_mut()
             .map_err(|_| Error::WriteToPropertyFailed)?
             .copy_within(src..(src + 1), dst);
         return Ok(());
@@ -244,7 +288,7 @@ impl<T: TPropData> GenericProperty for PropertyRef<T> {
     fn len(&self) -> Result<usize, Error> {
         Ok(self
             .upgrade()?
-            .read()
+            .try_borrow()
             .map_err(|_| Error::ReadPropertyFailed)?
             .len())
     }
