@@ -64,11 +64,27 @@ impl Mesh {
         &self.edges[(h << 1) as usize].halfedges[(h & 1) as usize]
     }
 
+    pub fn is_boundary_halfedge(&self, h: u32) -> bool {
+        self.halfedge(h).face.is_none()
+    }
+
     pub fn is_boundary_vertex(&self, v: u32) -> bool {
         match self.vertices[v as usize].halfedge {
-            Some(h) => self.halfedge(h).face.is_some(),
+            Some(h) => self.is_boundary_halfedge(h),
             None => true,
         }
+    }
+
+    pub const fn opposite_halfedge(&self, h: u32) -> u32 {
+        h ^ 1
+    }
+
+    pub fn cw_rotated_halfedge(&self, h: u32) -> u32 {
+        self.halfedge(self.opposite_halfedge(h)).next
+    }
+
+    pub fn ccw_rotated_halfedge(&self, h: u32) -> u32 {
+        self.opposite_halfedge(self.halfedge(h).prev)
     }
 
     pub fn add_vertex(&mut self, pos: glam::Vec3) -> Result<u32, Error> {
@@ -78,9 +94,16 @@ impl Mesh {
         return Ok(vi);
     }
 
-    pub fn add_face(&mut self, v0: u32, v1: u32, v2: u32) -> u32 {
-        let fi = self.faces.len();
+    pub fn add_face(&mut self, verts: &[u32]) -> u32 {
         todo!("Not Implemented");
+    }
+
+    pub fn add_tri_face(&mut self, v0: u32, v1: u32, v2: u32) -> u32 {
+        self.add_face(&[v0, v1, v2])
+    }
+
+    pub fn add_quad_face(&mut self, v0: u32, v1: u32, v2: u32, v3: u32) -> u32 {
+        self.add_face(&[v0, v1, v2, v3])
     }
 }
 
