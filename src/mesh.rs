@@ -83,7 +83,7 @@ impl Mesh {
 
     pub fn add_face(&mut self, v0: u32, v1: u32, v2: u32) -> u32 {
         let fi = self.faces.len();
-        todo!();
+        todo!("Not Implemented");
     }
 }
 
