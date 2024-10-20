@@ -1,5 +1,3 @@
-mod mesh;
-
 use eframe::{
     egui, egui_glow,
     glow::{self, HasContext},
