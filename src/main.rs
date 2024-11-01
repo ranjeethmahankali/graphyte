@@ -1,3 +1,6 @@
+mod meshview;
+mod error;
+
 use eframe::{
     egui, egui_glow,
     glow::{self, HasContext},
