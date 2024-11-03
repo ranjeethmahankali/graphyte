@@ -1,12 +1,13 @@
 mod error;
 mod meshview;
 
+use alum::{element::Handle, mesh::PolyMeshF32};
 use eframe::{
     egui, egui_glow,
     glow::{self, HasContext},
 };
 use egui::mutex::Mutex;
-use meshview::{MeshVertex, VertexBuffer};
+use meshview::{IndexBuffer, MeshVertex, VertexBuffer};
 use std::sync::Arc;
 
 fn main() -> eframe::Result {
@@ -124,6 +125,7 @@ impl MyApp {
 struct Scene {
     program: glow::Program,
     vbuf: VertexBuffer<MeshVertex>,
+    ibuf: IndexBuffer,
 }
 
 impl Scene {
@@ -166,12 +168,33 @@ impl Scene {
                 gl.detach_shader(program, shader);
                 gl.delete_shader(shader);
             }
-            let vbuf = VertexBuffer::<MeshVertex>::new(
-                todo!("Get the number of vertices from the mesh"),
+            let mut mesh =
+                PolyMeshF32::quad_box(glam::Vec3::splat(0.), glam::Vec3::splat(1.)).unwrap();
+            let vnormals = mesh.update_vertex_normals_fast().unwrap();
+            let mesh = mesh;
+            let vnormals = vnormals.try_borrow().unwrap();
+            let vnormals: &[glam::Vec3] = &vnormals;
+            let vbuf = VertexBuffer::<MeshVertex>::from_iter(
+                mesh.vertices().map(|v| {
+                    MeshVertex::new(
+                        mesh.point(v).unwrap(),
+                        vnormals[v.index() as usize],
+                        glam::vec3(1., 1., 1.),
+                    )
+                }),
                 gl,
             )
             .expect("Failed to create vertex buffer");
-            Self { program, vbuf }
+            let ibuf = IndexBuffer::from_iter(
+                mesh.triangulated_vertices().flatten().map(|v| v.index()),
+                gl,
+            )
+            .expect("Failed to create an index buffer");
+            Self {
+                program,
+                vbuf,
+                ibuf,
+            }
         }
     }
 
@@ -180,6 +203,7 @@ impl Scene {
         unsafe {
             gl.delete_program(self.program);
             self.vbuf.free(gl);
+            self.ibuf.free(gl);
         }
     }
 
@@ -192,10 +216,16 @@ impl Scene {
                 false,
                 &mvp.to_cols_array(),
             );
-            self.vbuf.bind(gl);
+            self.vbuf.bind_vao(gl);
+            self.ibuf.bind(gl);
             gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL);
             gl.disable(glow::POLYGON_OFFSET_FILL);
-            gl.draw_elements(glow::TRIANGLES, todo!(), glow::UNSIGNED_INT, 0);
+            gl.draw_elements(
+                glow::TRIANGLES,
+                self.ibuf.len() as i32,
+                glow::UNSIGNED_INT,
+                0,
+            );
         }
     }
 }

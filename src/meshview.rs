@@ -1,70 +1,61 @@
+use std::marker::PhantomData;
+
 use eframe::glow::{self, HasContext};
 
 pub trait Vertex: Default + Copy + Clone + Sized + 'static {
     fn init_attributes(gl: &glow::Context);
 }
 
-pub struct VertexBuffer<T: Vertex> {
-    vertices: Vec<T>,
+pub struct VertexBuffer<V: Vertex> {
     vao: glow::VertexArray,
     vbo: glow::Buffer,
+    phantom: PhantomData<V>,
 }
 
 use crate::error::Error;
 
-fn to_byte_slice<'a, T: Vertex>(data: &'a [T]) -> &'a [u8] {
+fn to_byte_slice<'a, T: Sized>(data: &'a [T]) -> &'a [u8] {
     unsafe { std::slice::from_raw_parts(data.as_ptr() as *const u8, data.len() * size_of::<T>()) }
 }
 
-impl<T: Vertex> VertexBuffer<T> {
-    pub fn new(nverts: usize, gl: &glow::Context) -> Result<Self, Error> {
-        let vertices = vec![T::default(); nverts];
+impl<V: Vertex> VertexBuffer<V> {
+    pub fn from_iter<I>(iter: I, gl: &glow::Context) -> Result<Self, Error>
+    where
+        I: Iterator<Item = V>,
+    {
+        let vertices = iter.collect::<Vec<V>>();
         let (vao, vbo) = unsafe {
             (
                 gl.create_vertex_array().map_err(|e| Error::GLError(e))?,
                 gl.create_buffer().map_err(|e| Error::GLError(e))?,
             )
         };
-        Ok(VertexBuffer { vertices, vao, vbo })
-    }
-
-    pub fn bind(&self, gl: &glow::Context) {
         unsafe {
-            gl.bind_vertex_array(Some(self.vao));
-            gl.bind_buffer(glow::ARRAY_BUFFER, Some(self.vbo));
+            gl.bind_vertex_array(Some(vao));
+            gl.bind_buffer(glow::ARRAY_BUFFER, Some(vbo));
+            gl.buffer_data_u8_slice(
+                glow::ARRAY_BUFFER,
+                to_byte_slice(&vertices),
+                glow::STATIC_DRAW,
+            );
         }
-    }
-
-    pub fn unbind(&self, gl: &glow::Context) {
+        V::init_attributes(gl);
+        // Unbind.
         unsafe {
             gl.bind_vertex_array(None);
             gl.bind_buffer(glow::ARRAY_BUFFER, None);
         }
+        Ok(VertexBuffer::<V> {
+            vao,
+            vbo,
+            phantom: PhantomData,
+        })
     }
 
-    fn init(&mut self, gl: &glow::Context) -> Result<(), Error> {
+    pub fn bind_vao(&self, gl: &glow::Context) {
         unsafe {
-            self.vao = gl.create_vertex_array().map_err(|e| Error::GLError(e))?;
-            self.vbo = gl.create_buffer().map_err(|e| Error::GLError(e))?;
+            gl.bind_vertex_array(Some(self.vao));
         }
-        Ok(())
-    }
-
-    fn alloc(&mut self, gl: &glow::Context) -> Result<(), Error> {
-        self.free(gl);
-        self.init(gl)?;
-        // Bind and copy data.
-        self.bind(gl);
-        unsafe {
-            gl.buffer_data_u8_slice(
-                glow::ARRAY_BUFFER,
-                to_byte_slice(&self.vertices),
-                glow::STATIC_DRAW,
-            );
-        }
-        T::init_attributes(gl);
-        self.unbind(gl);
-        Ok(())
     }
 
     pub fn free(&self, gl: &glow::Context) {
@@ -75,12 +66,66 @@ impl<T: Vertex> VertexBuffer<T> {
     }
 }
 
+pub struct IndexBuffer {
+    ibo: glow::Buffer,
+    num_indices: usize,
+}
+
+impl IndexBuffer {
+    pub fn from_iter<I>(iter: I, gl: &glow::Context) -> Result<IndexBuffer, Error>
+    where
+        I: Iterator<Item = u32>,
+    {
+        let indices: Vec<_> = iter.collect();
+        let ibo = unsafe { gl.create_buffer().map_err(|e| Error::GLError(e))? };
+        unsafe {
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(ibo));
+            gl.buffer_data_u8_slice(
+                glow::ELEMENT_ARRAY_BUFFER,
+                to_byte_slice(&indices),
+                glow::STATIC_DRAW,
+            );
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, None);
+        }
+        Ok(IndexBuffer {
+            ibo,
+            num_indices: indices.len(),
+        })
+    }
+
+    pub fn free(&self, gl: &glow::Context) {
+        unsafe {
+            gl.delete_buffer(self.ibo);
+        }
+    }
+
+    pub fn bind(&self, gl: &glow::Context) {
+        unsafe {
+            gl.bind_buffer(glow::ELEMENT_ARRAY_BUFFER, Some(self.ibo));
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.num_indices
+    }
+}
+
 #[derive(Default, Copy, Clone)]
 #[repr(C)]
 pub struct MeshVertex {
     position: glam::Vec3,
     normal: glam::Vec3,
     color: glam::Vec3,
+}
+
+impl MeshVertex {
+    pub fn new(position: glam::Vec3, normal: glam::Vec3, color: glam::Vec3) -> MeshVertex {
+        MeshVertex {
+            position,
+            normal,
+            color,
+        }
+    }
 }
 
 impl Vertex for MeshVertex {
