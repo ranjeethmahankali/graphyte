@@ -1,11 +1,12 @@
-mod meshview;
 mod error;
+mod meshview;
 
 use eframe::{
     egui, egui_glow,
     glow::{self, HasContext},
 };
 use egui::mutex::Mutex;
+use meshview::{MeshVertex, VertexBuffer};
 use std::sync::Arc;
 
 fn main() -> eframe::Result {
@@ -30,7 +31,7 @@ const FAR: f32 = 100.0;
 
 struct MyApp {
     /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
-    rotating_triangle: Arc<Mutex<RotatingTriangle>>,
+    rotating_triangle: Arc<Mutex<Scene>>,
     projection: glam::Mat4,
     view: glam::Mat4,
 }
@@ -49,7 +50,7 @@ impl MyApp {
             gl.enable(glow::LINE_SMOOTH);
         }
         Self {
-            rotating_triangle: Arc::new(Mutex::new(RotatingTriangle::new(gl))),
+            rotating_triangle: Arc::new(Mutex::new(Scene::new(gl))),
             projection: glam::Mat4::perspective_rh_gl(
                 FOVY,
                 VIEWPORT_WIDTH / VIEWPORT_HEIGHT,
@@ -120,12 +121,12 @@ impl MyApp {
     }
 }
 
-struct RotatingTriangle {
+struct Scene {
     program: glow::Program,
-    vertex_array: glow::VertexArray,
+    vbuf: VertexBuffer<MeshVertex>,
 }
 
-impl RotatingTriangle {
+impl Scene {
     fn new(gl: &glow::Context) -> Self {
         use glow::HasContext as _;
         unsafe {
@@ -165,13 +166,12 @@ impl RotatingTriangle {
                 gl.detach_shader(program, shader);
                 gl.delete_shader(shader);
             }
-            let vertex_array = gl
-                .create_vertex_array()
-                .expect("Cannot create vertex array");
-            Self {
-                program,
-                vertex_array,
-            }
+            let vbuf = VertexBuffer::<MeshVertex>::new(
+                todo!("Get the number of vertices from the mesh"),
+                gl,
+            )
+            .expect("Failed to create vertex buffer");
+            Self { program, vbuf }
         }
     }
 
@@ -179,7 +179,7 @@ impl RotatingTriangle {
         use glow::HasContext as _;
         unsafe {
             gl.delete_program(self.program);
-            gl.delete_vertex_array(self.vertex_array);
+            self.vbuf.free(gl);
         }
     }
 
@@ -192,10 +192,10 @@ impl RotatingTriangle {
                 false,
                 &mvp.to_cols_array(),
             );
-            gl.bind_vertex_array(Some(self.vertex_array));
+            self.vbuf.bind(gl);
             gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL);
             gl.disable(glow::POLYGON_OFFSET_FILL);
-            gl.draw_arrays(glow::TRIANGLES, 0, 9);
+            gl.draw_elements(glow::TRIANGLES, todo!(), glow::UNSIGNED_INT, 0);
         }
     }
 }
