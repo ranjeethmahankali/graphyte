@@ -7,4 +7,4 @@ edition = "2021"
 egui = "0.28"
 eframe = "0.28"
 glam = "0.8.5"
-alum = { path = "../alum" }
+alum = { git = "https://github.com/ranjeethmahankali/alum", branch = "bump" }
