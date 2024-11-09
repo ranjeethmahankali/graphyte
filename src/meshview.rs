@@ -1,8 +1,8 @@
-use std::marker::PhantomData;
+use std::{fmt::Debug, marker::PhantomData};
 
 use eframe::glow::{self, HasContext};
 
-pub trait Vertex: Default + Copy + Clone + Sized + 'static {
+pub trait Vertex: Debug + Default + Copy + Clone + Sized + 'static {
     fn init_attributes(gl: &glow::Context);
 }
 
@@ -118,6 +118,24 @@ pub struct MeshVertex {
     color: glam::Vec3,
 }
 
+impl Debug for MeshVertex {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "pos: ({}, {}, {}); norm: ({}, {}, {}); color: ({}, {}, {})",
+            self.position.x(),
+            self.position.y(),
+            self.position.z(),
+            self.normal.x(),
+            self.normal.y(),
+            self.normal.z(),
+            self.color.x(),
+            self.color.y(),
+            self.color.z()
+        )
+    }
+}
+
 impl MeshVertex {
     pub fn new(position: glam::Vec3, normal: glam::Vec3, color: glam::Vec3) -> MeshVertex {
         MeshVertex {
@@ -147,9 +165,9 @@ impl Vertex for MeshVertex {
         unsafe {
             gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, STRIDE, OFFSETS.0);
             gl.enable_vertex_attrib_array(0);
-            gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, STRIDE, OFFSETS.1);
+            gl.vertex_attrib_pointer_f32(1, 3, glow::FLOAT, false, STRIDE, OFFSETS.1);
             gl.enable_vertex_attrib_array(1);
-            gl.vertex_attrib_pointer_f32(0, 3, glow::FLOAT, false, STRIDE, OFFSETS.2);
+            gl.vertex_attrib_pointer_f32(2, 3, glow::FLOAT, false, STRIDE, OFFSETS.2);
             gl.enable_vertex_attrib_array(2);
         }
     }

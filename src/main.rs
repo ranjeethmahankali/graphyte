@@ -10,6 +10,24 @@ use egui::mutex::Mutex;
 use meshview::{IndexBuffer, MeshVertex, VertexBuffer};
 use std::sync::Arc;
 
+macro_rules! gl_call {
+    ($ctx:expr, $call:expr) => {{
+        #[cfg(debug_assertions)]
+        {
+            let out = $call;
+            let err: u32 = $ctx.get_error();
+            if err != 0 {
+                panic!("OpenGL Error {}", err);
+            }
+            out
+        }
+        #[cfg(not(debug_assertions))]
+        {
+            $call
+        }
+    }};
+}
+
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_maximized(true),
@@ -45,10 +63,13 @@ impl MyApp {
             .expect("You need to run eframe with the glow backend");
         let gl: &glow::Context = gl;
         unsafe {
-            gl.enable(glow::DEPTH_TEST);
-            gl.enable(glow::BLEND);
-            gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
-            gl.enable(glow::LINE_SMOOTH);
+            gl_call!(gl, gl.enable(glow::DEPTH_TEST));
+            gl_call!(gl, gl.enable(glow::BLEND));
+            gl_call!(
+                gl,
+                gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA)
+            );
+            gl_call!(gl, gl.enable(glow::LINE_SMOOTH));
         }
         Self {
             rotating_triangle: Arc::new(Mutex::new(Scene::new(gl))),
@@ -59,7 +80,7 @@ impl MyApp {
                 FAR,
             ),
             view: glam::Mat4::look_at_rh(
-                glam::vec3(1.0, 1.0, 1.0),
+                glam::vec3(2.0, 2.0, 2.0),
                 glam::vec3(0.0, 0.0, 0.0),
                 glam::vec3(0.0, 0.0, 1.0),
             ),
@@ -132,7 +153,7 @@ impl Scene {
     fn new(gl: &glow::Context) -> Self {
         use glow::HasContext as _;
         unsafe {
-            let program = gl.create_program().expect("Cannot create program");
+            let program = gl_call!(gl, gl.create_program().expect("Cannot create program"));
             let (vertex_shader_source, fragment_shader_source) = (
                 include_str!("shaders/vertex.glsl"),
                 include_str!("shaders/fragment.glsl"),
@@ -144,33 +165,39 @@ impl Scene {
             let shaders: Vec<_> = shader_sources
                 .iter()
                 .map(|(shader_type, shader_source)| {
-                    let shader = gl
-                        .create_shader(*shader_type)
-                        .expect("Cannot create shader");
-                    gl.shader_source(shader, shader_source);
-                    gl.compile_shader(shader);
+                    let shader = gl_call!(
+                        gl,
+                        gl.create_shader(*shader_type)
+                            .expect("Cannot create shader")
+                    );
+                    gl_call!(gl, gl.shader_source(shader, shader_source));
+                    gl_call!(gl, gl.compile_shader(shader));
                     assert!(
                         gl.get_shader_compile_status(shader),
                         "Failed to compile {shader_type}: {}",
                         gl.get_shader_info_log(shader)
                     );
-                    gl.attach_shader(program, shader);
+                    gl_call!(gl, gl.attach_shader(program, shader));
                     shader
                 })
                 .collect();
-            gl.link_program(program);
+            gl_call!(gl, gl.link_program(program));
             assert!(
                 gl.get_program_link_status(program),
                 "{}",
                 gl.get_program_info_log(program)
             );
             for shader in shaders {
-                gl.detach_shader(program, shader);
-                gl.delete_shader(shader);
+                gl_call!(gl, gl.detach_shader(program, shader));
+                gl_call!(gl, gl.delete_shader(shader));
             }
             let mut mesh =
                 PolyMeshF32::quad_box(glam::Vec3::splat(0.), glam::Vec3::splat(1.)).unwrap();
-            let vnormals = mesh.update_vertex_normals_fast().unwrap();
+            mesh.update_face_normals()
+                .expect("Cannot update face normals");
+            let vnormals = mesh
+                .update_vertex_normals_fast()
+                .expect("Cannot update vertex normals");
             let mesh = mesh;
             let vnormals = vnormals.try_borrow().unwrap();
             let vnormals: &[glam::Vec3] = &vnormals;
@@ -210,21 +237,26 @@ impl Scene {
     fn paint(&self, gl: &glow::Context, mvp: glam::Mat4) {
         use glow::HasContext as _;
         unsafe {
-            gl.use_program(Some(self.program));
-            gl.uniform_matrix_4_f32_slice(
-                gl.get_uniform_location(self.program, "u_mvp").as_ref(),
-                false,
-                &mvp.to_cols_array(),
+            gl_call!(gl, gl.use_program(Some(self.program)));
+            gl_call!(
+                gl,
+                gl.uniform_matrix_4_f32_slice(
+                    gl.get_uniform_location(self.program, "u_mvp").as_ref(),
+                    false,
+                    &mvp.to_cols_array(),
+                )
             );
-            self.vbuf.bind_vao(gl);
-            self.ibuf.bind(gl);
-            gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL);
-            gl.disable(glow::POLYGON_OFFSET_FILL);
-            gl.draw_elements(
-                glow::TRIANGLES,
-                self.ibuf.len() as i32,
-                glow::UNSIGNED_INT,
-                0,
+            gl_call!(gl, self.vbuf.bind_vao(gl));
+            gl_call!(gl, self.ibuf.bind(gl));
+            gl_call!(gl, gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL));
+            gl_call!(
+                gl,
+                gl.draw_elements(
+                    glow::TRIANGLES,
+                    self.ibuf.len() as i32,
+                    glow::UNSIGNED_INT,
+                    0,
+                )
             );
         }
     }
