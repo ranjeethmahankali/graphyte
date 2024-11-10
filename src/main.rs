@@ -31,8 +31,10 @@ macro_rules! gl_call {
 fn main() -> eframe::Result {
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default().with_maximized(true),
-        multisampling: 4,
+        multisampling: 8,
         renderer: eframe::Renderer::Glow,
+        depth_buffer: 24,
+        follow_system_theme: true,
         ..Default::default()
     };
     eframe::run_native(
@@ -63,6 +65,8 @@ impl MyApp {
             .expect("You need to run eframe with the glow backend");
         let gl: &glow::Context = gl;
         unsafe {
+            gl_call!(gl, gl.depth_func(glow::LESS));
+            gl_call!(gl, gl.depth_mask(true));
             gl_call!(gl, gl.enable(glow::DEPTH_TEST));
             gl_call!(gl, gl.enable(glow::BLEND));
             gl_call!(
@@ -80,7 +84,7 @@ impl MyApp {
                 FAR,
             ),
             view: glam::Mat4::look_at_rh(
-                glam::vec3(2.0, 2.0, 2.0),
+                glam::vec3(1.5, 1.5, 1.5),
                 glam::vec3(0.0, 0.0, 0.0),
                 glam::vec3(0.0, 0.0, 1.0),
             ),
@@ -192,7 +196,7 @@ impl Scene {
                 gl_call!(gl, gl.delete_shader(shader));
             }
             let mut mesh =
-                PolyMeshF32::quad_box(glam::Vec3::splat(0.), glam::Vec3::splat(1.)).unwrap();
+                PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5)).unwrap();
             mesh.update_face_normals()
                 .expect("Cannot update face normals");
             let vnormals = mesh
@@ -237,6 +241,7 @@ impl Scene {
     fn paint(&self, gl: &glow::Context, mvp: glam::Mat4) {
         use glow::HasContext as _;
         unsafe {
+            gl_call!(gl, gl.clear(glow::DEPTH_BUFFER_BIT));
             gl_call!(gl, gl.use_program(Some(self.program)));
             gl_call!(
                 gl,
