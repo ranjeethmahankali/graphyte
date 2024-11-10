@@ -16,7 +16,7 @@ pub fn main() {
     .unwrap();
     let context = window.gl();
 
-    let target = vec3(0.0, 2.0, 0.0);
+    let target = vec3(0.0, 0.0, 0.0);
     let scene_radius = 6.0;
     let mut camera = Camera::new_perspective(
         window.viewport(),
@@ -33,16 +33,18 @@ pub fn main() {
         let mesh = {
             // let mut mesh = alum::PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5))
             //     .expect("Cannot create a mesh");
-            let mut mesh =
-                PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
-                    .expect("Cannot load obj");
-            {
-                let mut points = mesh.points();
-                let mut points = points.try_borrow_mut().expect("Cannot borrow points");
-                for p in points.iter_mut() {
-                    *p = *p * 10.; // Scale the mesh.
-                }
-            }
+            // let mut mesh =
+            //     PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
+            //         .expect("Cannot load obj");
+            let mut mesh = PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5))
+                .expect("Cannot create a box mesh");
+            // {
+            //     let mut points = mesh.points();
+            //     let mut points = points.try_borrow_mut().expect("Cannot borrow points");
+            //     for p in points.iter_mut() {
+            //         *p = *p * 10.; // Scale the mesh.
+            //     }
+            // }
             mesh.update_face_normals()
                 .expect("Cannot update face normals");
             mesh.update_vertex_normals_fast()
@@ -61,7 +63,6 @@ pub fn main() {
                     .map(|v| v.index())
                     .collect(),
             ),
-            colors: Some(vec![Srgba::new(128, 128, 128, 255); points.len()]),
             normals: Some(vnormals.iter().map(|n| vec3(n.x, n.y, n.z)).collect()),
             ..Default::default()
         };
