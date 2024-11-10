@@ -39,10 +39,10 @@ impl CameraMouseControl {
             *speed = 0.01 * target.distance(*camera.position()) + 0.001;
         }
         if let CameraAction::Left { speed } = &mut self.control.left_drag_horizontal {
-            *speed = 0.0005 * camera.target().distance(*camera.position()) + 0.001;
+            *speed = 0.0005 * camera.target().distance(*camera.position()) + 0.00001;
         }
         if let CameraAction::Up { speed } = &mut self.control.left_drag_vertical {
-            *speed = 0.0005 * camera.target().distance(*camera.position()) + 0.001;
+            *speed = 0.0005 * camera.target().distance(*camera.position()) + 0.00001;
         }
         self.control.handle_events(camera, events)
     }
