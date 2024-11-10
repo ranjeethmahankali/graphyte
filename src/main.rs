@@ -16,7 +16,7 @@ pub fn main() {
     .unwrap();
     let context = window.gl();
 
-    let target = vec3(0.0, 0.0, 0.0);
+    let target = vec3(0.0, 1.0, 0.0);
     let scene_radius = 6.0;
     let mut camera = Camera::new_perspective(
         window.viewport(),
@@ -31,20 +31,16 @@ pub fn main() {
     // Create a CPU-side mesh consisting of a single colored triangle
     let (model, etransforms, vtransforms) = {
         let mesh = {
-            // let mut mesh = alum::PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5))
-            //     .expect("Cannot create a mesh");
-            // let mut mesh =
-            //     PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
-            //         .expect("Cannot load obj");
-            let mut mesh = PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5))
-                .expect("Cannot create a box mesh");
-            // {
-            //     let mut points = mesh.points();
-            //     let mut points = points.try_borrow_mut().expect("Cannot borrow points");
-            //     for p in points.iter_mut() {
-            //         *p = *p * 10.; // Scale the mesh.
-            //     }
-            // }
+            let mut mesh =
+                PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
+                    .expect("Cannot load obj");
+            {
+                let mut points = mesh.points();
+                let mut points = points.try_borrow_mut().expect("Cannot borrow points");
+                for p in points.iter_mut() {
+                    *p = *p * 10.; // Scale the mesh.
+                }
+            }
             mesh.update_face_normals()
                 .expect("Cannot update face normals");
             mesh.update_vertex_normals_fast()
@@ -56,7 +52,7 @@ pub fn main() {
         let vnormals = mesh.vertex_normals().expect("Cannot borrow vertex normals");
         let vnormals = vnormals.try_borrow().expect("Cannot borrow vertex normals");
         let cpumesh = CpuMesh {
-            positions: Positions::F32(points.iter().map(|p| 2. * vec3(p.x, p.y, p.z)).collect()),
+            positions: Positions::F32(points.iter().map(|p| vec3(p.x, p.y, p.z)).collect()),
             indices: Indices::U32(
                 mesh.triangulated_vertices()
                     .flatten()
@@ -85,14 +81,11 @@ pub fn main() {
                         let mut ev = mesh.calc_halfedge_vector(h, &points);
                         let length = ev.length();
                         ev /= length;
+                        let ev = vec3(ev.x, ev.y, ev.z);
                         let start = points[mesh.from_vertex(h).index() as usize];
                         let start = vec3(start.x, start.y, start.z);
                         Mat4::from_translation(start)
-                            * Into::<Mat4>::into(Quat::from_arc(
-                                vec3(1.0, 0., 0.0),
-                                vec3(ev.x, ev.y, ev.z),
-                                None,
-                            ))
+                            * Into::<Mat4>::into(Quat::from_arc(vec3(1.0, 0., 0.0), ev, None))
                             * Mat4::from_nonuniform_scale(length, 1., 1.)
                     })
                     .collect(),
@@ -118,14 +111,14 @@ pub fn main() {
     );
     wireframe_material.render_states.cull = Cull::Back;
     let mut sphere = CpuMesh::sphere(8);
-    sphere.transform(&Mat4::from_scale(0.01)).unwrap();
+    sphere.transform(&Mat4::from_scale(0.005)).unwrap();
     let vertices = Gm::new(
         InstancedMesh::new(&context, &vtransforms, &sphere),
         wireframe_material.clone(),
     );
     let mut cylinder = CpuMesh::cylinder(10);
     cylinder
-        .transform(&Mat4::from_nonuniform_scale(1.0, 0.007, 0.007))
+        .transform(&Mat4::from_nonuniform_scale(1.0, 0.002, 0.002))
         .unwrap();
     let edges = Gm::new(
         InstancedMesh::new(&context, &etransforms, &cylinder),
