@@ -12,7 +12,7 @@ use three_d::{
 pub fn main() {
     let window = Window::new(WindowSettings {
         title: "Viewer".to_string(),
-        min_size: (1280, 720),
+        min_size: (512, 256),
         ..Default::default()
     })
     .unwrap();
