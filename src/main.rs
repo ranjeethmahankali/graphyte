@@ -2,8 +2,8 @@ use alum::{element::Handle, PolyMeshF32};
 use std::path::PathBuf;
 use three_d::{
     degrees, vec3, AmbientLight, Camera, ClearState, CpuMaterial, CpuMesh, Cull, DirectionalLight,
-    FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, OrbitControl,
-    PhysicalMaterial, Positions, Quat, Srgba, Window, WindowSettings,
+    Event, FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, MouseButton,
+    OrbitControl, PhysicalMaterial, Positions, Quat, Srgba, Window, WindowSettings,
 };
 
 pub fn main() {
@@ -129,8 +129,24 @@ pub fn main() {
     window.render_loop(move |mut frame_input| {
         let mut redraw = frame_input.first_frame;
         redraw |= camera.set_viewport(frame_input.viewport);
+        for event in frame_input.events.iter() {
+            redraw |= match *event {
+                Event::MouseMotion { delta, button, .. } => {
+                    if button == Some(MouseButton::Right) {
+                        let speed = 0.01;
+                        let right = camera.right_direction();
+                        let up = right.cross(camera.view_direction());
+                        let delta = -right * speed * delta.0 + up * speed * delta.1;
+                        camera.translate(&delta);
+                        true
+                    } else {
+                        false
+                    }
+                }
+                _ => false, // Do nothing.
+            };
+        }
         redraw |= control.handle_events(&mut camera, &mut frame_input.events);
-
         if redraw {
             frame_input
                 .screen()
@@ -141,7 +157,6 @@ pub fn main() {
                     &[&ambient, &directional0, &directional1],
                 );
         }
-
         FrameOutput {
             swap_buffers: redraw,
             ..Default::default()
