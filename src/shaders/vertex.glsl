@@ -1,4 +1,4 @@
-#version 410
+#version 330 core
 
 layout(location = 0) in vec3 position;
 layout(location = 1) in vec3 normal;
@@ -16,4 +16,6 @@ void main()
   vertNorm      = normalize(u_mvp * vec4(normal, 0.0));
   vertNormWorld = normalize(vertNorm);
   vertColor     = color;
+  // float depth = (gl_Position.w - 2.14) * 0.75;
+  // vertColor = vec3(depth, depth, depth);
 }

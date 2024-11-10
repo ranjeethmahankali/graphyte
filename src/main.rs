@@ -2,10 +2,7 @@ mod error;
 mod meshview;
 
 use alum::{element::Handle, mesh::PolyMeshF32};
-use eframe::{
-    egui, egui_glow,
-    glow::{self, HasContext},
-};
+use eframe::{egui, egui_glow, glow};
 use egui::mutex::Mutex;
 use meshview::{IndexBuffer, MeshVertex, VertexBuffer};
 use std::sync::Arc;
@@ -44,8 +41,8 @@ fn main() -> eframe::Result {
     )
 }
 
-const VIEWPORT_WIDTH: f32 = 1280.0;
-const VIEWPORT_HEIGHT: f32 = 768.0;
+const VIEWPORT_WIDTH: f32 = 2400.;
+const VIEWPORT_HEIGHT: f32 = 1200.;
 const FOVY: f32 = 0.9;
 const NEAR: f32 = 0.01;
 const FAR: f32 = 100.0;
@@ -63,18 +60,6 @@ impl MyApp {
             .gl
             .as_ref()
             .expect("You need to run eframe with the glow backend");
-        let gl: &glow::Context = gl;
-        unsafe {
-            gl_call!(gl, gl.depth_func(glow::LESS));
-            gl_call!(gl, gl.depth_mask(true));
-            gl_call!(gl, gl.enable(glow::DEPTH_TEST));
-            gl_call!(gl, gl.enable(glow::BLEND));
-            gl_call!(
-                gl,
-                gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA)
-            );
-            gl_call!(gl, gl.enable(glow::LINE_SMOOTH));
-        }
         Self {
             rotating_triangle: Arc::new(Mutex::new(Scene::new(gl))),
             projection: glam::Mat4::perspective_rh_gl(
@@ -101,7 +86,7 @@ impl eframe::App for MyApp {
         egui::CentralPanel::default().show(ctx, |ui| {
             ui.horizontal(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
-                ui.label("The triangle is being painted using ");
+                ui.label("The box is being painted using ");
                 ui.hyperlink_to("glow", "https://github.com/grovesNL/glow");
                 ui.label(" (OpenGL).");
             });
@@ -156,7 +141,19 @@ struct Scene {
 impl Scene {
     fn new(gl: &glow::Context) -> Self {
         use glow::HasContext as _;
+        let gl: &glow::Context = gl;
         unsafe {
+            gl_call!(gl, gl.depth_func(glow::LESS));
+            gl_call!(gl, gl.depth_mask(true));
+            gl_call!(gl, gl.clear_depth_f32(1.));
+            gl_call!(gl, gl.depth_range_f32(0., 1.));
+            gl_call!(gl, gl.enable(glow::DEPTH_TEST));
+            gl_call!(gl, gl.enable(glow::BLEND));
+            gl_call!(
+                gl,
+                gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA)
+            );
+            gl_call!(gl, gl.enable(glow::LINE_SMOOTH));
             let program = gl_call!(gl, gl.create_program().expect("Cannot create program"));
             let (vertex_shader_source, fragment_shader_source) = (
                 include_str!("shaders/vertex.glsl"),
@@ -199,6 +196,18 @@ impl Scene {
                 PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5)).unwrap();
             mesh.update_face_normals()
                 .expect("Cannot update face normals");
+            let mut colors = mesh.create_vertex_prop::<glam::Vec3>();
+            let mut colors = colors
+                .try_borrow_mut()
+                .expect("Cannot borrow colors property");
+            colors[0] = glam::vec3(0., 0., 0.);
+            colors[1] = glam::vec3(1., 0., 0.);
+            colors[2] = glam::vec3(1., 1., 0.);
+            colors[3] = glam::vec3(0., 1., 0.);
+            colors[4] = glam::vec3(0., 0., 1.);
+            colors[5] = glam::vec3(1., 0., 1.);
+            colors[6] = glam::vec3(1., 1., 1.);
+            colors[7] = glam::vec3(0., 1., 1.);
             let vnormals = mesh
                 .update_vertex_normals_fast()
                 .expect("Cannot update vertex normals");
@@ -210,7 +219,7 @@ impl Scene {
                     MeshVertex::new(
                         mesh.point(v).unwrap(),
                         vnormals[v.index() as usize],
-                        glam::vec3(1., 1., 1.),
+                        colors[v.index() as usize],
                     )
                 }),
                 gl,
