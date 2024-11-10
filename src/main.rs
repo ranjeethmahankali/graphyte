@@ -1,15 +1,18 @@
+mod scene;
+
 use alum::{element::Handle, PolyMeshF32};
+use scene::CameraMouseControl;
 use std::path::PathBuf;
 use three_d::{
     degrees, vec3, AmbientLight, Camera, ClearState, CpuMaterial, CpuMesh, Cull, DirectionalLight,
-    Event, FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, MouseButton,
-    OrbitControl, PhysicalMaterial, Positions, Quat, Srgba, Window, WindowSettings,
+    FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, PhysicalMaterial,
+    Positions, Quat, Srgba, Window, WindowSettings,
 };
 
 pub fn main() {
     let window = Window::new(WindowSettings {
-        title: "Wireframe!".to_string(),
-        max_size: Some((1280, 720)),
+        title: "Viewer".to_string(),
+        min_size: (1280, 720),
         ..Default::default()
     })
     .unwrap();
@@ -42,7 +45,8 @@ pub fn main() {
         0.1,
         1000.0,
     );
-    let mut control = OrbitControl::new(*camera.target(), 0.1 * scene_radius, 100.0 * scene_radius);
+    let mut control =
+        CameraMouseControl::new(*camera.target(), 0.1 * scene_radius, 100.0 * scene_radius);
     // Create a CPU-side mesh consisting of a single colored triangle
     let (model, etransforms, vtransforms) = {
         let points = mesh.points();
@@ -129,23 +133,6 @@ pub fn main() {
     window.render_loop(move |mut frame_input| {
         let mut redraw = frame_input.first_frame;
         redraw |= camera.set_viewport(frame_input.viewport);
-        for event in frame_input.events.iter() {
-            redraw |= match *event {
-                Event::MouseMotion { delta, button, .. } => {
-                    if button == Some(MouseButton::Right) {
-                        let speed = 0.01;
-                        let right = camera.right_direction();
-                        let up = right.cross(camera.view_direction());
-                        let delta = -right * speed * delta.0 + up * speed * delta.1;
-                        camera.translate(&delta);
-                        true
-                    } else {
-                        false
-                    }
-                }
-                _ => false, // Do nothing.
-            };
-        }
         redraw |= control.handle_events(&mut camera, &mut frame_input.events);
         if redraw {
             frame_input
