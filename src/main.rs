@@ -1,4 +1,6 @@
-use alum::element::Handle;
+use std::path::PathBuf;
+
+use alum::{element::Handle, PolyMeshF32};
 use three_d::{
     degrees, radians, vec3, Camera, ClearState, ColorMaterial, CpuMesh, FrameOutput, Geometry, Gm,
     Indices, Mat4, Mesh, Positions, Srgba, Window, WindowSettings,
@@ -27,8 +29,11 @@ pub fn main() {
     );
 
     let mesh = {
-        let mut mesh = alum::PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5))
-            .expect("Cannot create a mesh");
+        // let mut mesh = alum::PolyMeshF32::quad_box(glam::Vec3::splat(-0.5), glam::Vec3::splat(0.5))
+        //     .expect("Cannot create a mesh");
+        let mut mesh =
+            PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
+                .expect("Cannot load obj");
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
@@ -41,26 +46,14 @@ pub fn main() {
     let vnormals = vnormals.try_borrow().expect("Cannot borrow vertex normals");
     // Create a CPU-side mesh consisting of a single colored triangle
     let cpu_mesh = CpuMesh {
-        positions: Positions::F32(points.iter().map(|p| vec3(p.x, p.y, p.z)).collect()),
+        positions: Positions::F32(points.iter().map(|p| 2. * vec3(p.x, p.y, p.z)).collect()),
         indices: Indices::U32(
             mesh.triangulated_vertices()
                 .flatten()
                 .map(|v| v.index())
                 .collect(),
         ),
-        colors: Some(
-            points
-                .iter()
-                .map(|p| {
-                    Srgba::new(
-                        if p.x < 0.0 { 0 } else { 255u8 },
-                        if p.y < 0.0 { 0 } else { 255u8 },
-                        if p.z < 0.0 { 0 } else { 255u8 },
-                        255,
-                    )
-                })
-                .collect(),
-        ),
+        colors: Some(vec![Srgba::new(128, 128, 128, 255); points.len()]),
         normals: Some(vnormals.iter().map(|n| vec3(n.x, n.y, n.z)).collect()),
         ..Default::default()
     };
