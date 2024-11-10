@@ -40,6 +40,10 @@ impl MyApp {
             .expect("You need to run eframe with the glow backend");
         let gl: &glow::Context = gl;
         unsafe {
+            gl.depth_mask(true);
+            gl.depth_range_f32(0., 1.);
+            gl.depth_func(glow::LESS);
+            gl.clear_depth_f32(1.);
             gl.enable(glow::DEPTH_TEST);
             gl.enable(glow::BLEND);
             gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
