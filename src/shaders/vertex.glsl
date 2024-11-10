@@ -1,21 +1,21 @@
-#version 330
+#version 330 core
 
-const vec3 verts[9] = vec3[9](vec3(1.0, 0.0, 0.0),
-                              vec3(0.0, 1.0, 0.0),
-                              vec3(0.0, 0.0, 0.0),
-                              vec3(0.0, 1.0, 0.0),
-                              vec3(0.0, 0.0, 1.0),
-                              vec3(0.0, 0.0, 0.0),
-                              vec3(0.0, 0.0, 1.0),
-                              vec3(1.0, 0.0, 0.0),
-                              vec3(0.0, 0.0, 0.0));
+layout(location = 0) in vec3 position;
+layout(location = 1) in vec3 normal;
+layout(location = 2) in vec3 color;
 
-const vec4 colors[3] = vec4[3](vec4(1.0, 0.0, 0.0, 1.0),
-                               vec4(0.0, 1.0, 0.0, 1.0),
-                               vec4(0.0, 0.0, 1.0, 1.0));
-out vec4 v_color;
+out vec4 vertNorm;
+out vec4 vertNormWorld;
+out vec3 vertColor;
+
 uniform mat4 u_mvp;
-void main() {
-  v_color = colors[gl_VertexID / 3];
-  gl_Position = u_mvp * vec4(verts[gl_VertexID], 1.0);
+
+void main()
+{
+  gl_Position = u_mvp * vec4(position, 1.0);
+  vertNorm      = normalize(u_mvp * vec4(normal, 0.0));
+  vertNormWorld = normalize(vertNorm);
+  vertColor     = color;
+  // float depth = (gl_Position.w - 2.14) * 0.75;
+  // vertColor = vec3(depth, depth, depth);
 }

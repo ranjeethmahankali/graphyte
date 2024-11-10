@@ -1,202 +1,152 @@
-use eframe::{
-    egui, egui_glow,
-    glow::{self, HasContext},
+mod scene;
+
+use alum::{element::Handle, PolyMeshF32};
+use scene::CameraMouseControl;
+use std::path::PathBuf;
+use three_d::{
+    degrees, vec3, AmbientLight, Camera, ClearState, CpuMaterial, CpuMesh, Cull, DirectionalLight,
+    FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, PhysicalMaterial,
+    Positions, Quat, Srgba, Window, WindowSettings,
 };
-use egui::mutex::Mutex;
-use std::sync::Arc;
 
-fn main() -> eframe::Result {
-    let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default().with_maximized(true),
-        multisampling: 4,
-        renderer: eframe::Renderer::Glow,
+pub fn main() {
+    let window = Window::new(WindowSettings {
+        title: "Viewer".to_string(),
+        min_size: (1280, 720),
         ..Default::default()
+    })
+    .unwrap();
+    let context = window.gl();
+    let mesh = {
+        let mut mesh =
+            PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
+                .expect("Cannot load obj");
+        {
+            let mut points = mesh.points();
+            let mut points = points.try_borrow_mut().expect("Cannot borrow points");
+            for p in points.iter_mut() {
+                *p = *p * 10.; // Scale the mesh.
+            }
+        }
+        mesh.update_face_normals()
+            .expect("Cannot update face normals");
+        mesh.update_vertex_normals_fast()
+            .expect("Cannot update vertex normals");
+        mesh
     };
-    eframe::run_native(
-        "Custom 3D painting in eframe using glow",
-        options,
-        Box::new(|cc| Ok(Box::new(MyApp::new(cc)))),
-    )
-}
-
-const VIEWPORT_WIDTH: f32 = 1280.0;
-const VIEWPORT_HEIGHT: f32 = 768.0;
-const FOVY: f32 = 0.9;
-const NEAR: f32 = 0.01;
-const FAR: f32 = 100.0;
-
-struct MyApp {
-    /// Behind an `Arc<Mutex<…>>` so we can pass it to [`egui::PaintCallback`] and paint later.
-    rotating_triangle: Arc<Mutex<RotatingTriangle>>,
-    projection: glam::Mat4,
-    view: glam::Mat4,
-}
-
-impl MyApp {
-    fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        let gl = cc
-            .gl
-            .as_ref()
-            .expect("You need to run eframe with the glow backend");
-        let gl: &glow::Context = gl;
-        unsafe {
-            gl.depth_mask(true);
-            gl.depth_range_f32(0., 1.);
-            gl.depth_func(glow::LESS);
-            gl.clear_depth_f32(1.);
-            gl.enable(glow::DEPTH_TEST);
-            gl.enable(glow::BLEND);
-            gl.blend_func(glow::SRC_ALPHA, glow::ONE_MINUS_SRC_ALPHA);
-            gl.enable(glow::LINE_SMOOTH);
-        }
-        Self {
-            rotating_triangle: Arc::new(Mutex::new(RotatingTriangle::new(gl))),
-            projection: glam::Mat4::perspective_rh_gl(
-                FOVY,
-                VIEWPORT_WIDTH / VIEWPORT_HEIGHT,
-                NEAR,
-                FAR,
+    let target = vec3(0.0, 1.0, 0.0);
+    let scene_radius: f32 = 6.0;
+    let mut camera = Camera::new_perspective(
+        window.viewport(),
+        target + scene_radius * vec3(0.6, 0.3, 1.0).normalize(),
+        target,
+        vec3(0.0, 1.0, 0.0),
+        degrees(45.0),
+        0.1,
+        1000.0,
+    );
+    let mut control =
+        CameraMouseControl::new(*camera.target(), 0.1 * scene_radius, 100.0 * scene_radius);
+    // Create a CPU-side mesh consisting of a single colored triangle
+    let (model, etransforms, vtransforms) = {
+        let points = mesh.points();
+        let points = points.try_borrow().expect("Cannot borrow points");
+        let vnormals = mesh.vertex_normals().expect("Cannot borrow vertex normals");
+        let vnormals = vnormals.try_borrow().expect("Cannot borrow vertex normals");
+        let cpumesh = CpuMesh {
+            positions: Positions::F32(points.iter().map(|p| vec3(p.x, p.y, p.z)).collect()),
+            indices: Indices::U32(
+                mesh.triangulated_vertices()
+                    .flatten()
+                    .map(|v| v.index())
+                    .collect(),
             ),
-            view: glam::Mat4::look_at_rh(
-                glam::vec3(1.0, 1.0, 1.0),
-                glam::vec3(0.0, 0.0, 0.0),
-                glam::vec3(0.0, 0.0, 1.0),
-            ),
-        }
-    }
-
-    fn mvp_mat(&self) -> glam::Mat4 {
-        self.projection * self.view
-    }
-}
-
-impl eframe::App for MyApp {
-    fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        egui::CentralPanel::default().show(ctx, |ui| {
-            ui.horizontal(|ui| {
-                ui.spacing_mut().item_spacing.x = 0.0;
-                ui.label("The triangle is being painted using ");
-                ui.hyperlink_to("glow", "https://github.com/grovesNL/glow");
-                ui.label(" (OpenGL).");
-            });
-            egui::Frame::canvas(ui.style()).show(ui, |ui| {
-                self.custom_painting(ui);
-            });
-            ui.label("Drag to rotate!");
-        });
-    }
-
-    fn on_exit(&mut self, gl: Option<&glow::Context>) {
-        if let Some(gl) = gl {
-            self.rotating_triangle.lock().destroy(gl);
-        }
-    }
-}
-
-impl MyApp {
-    fn custom_painting(&mut self, ui: &mut egui::Ui) {
-        let (rect, response) = ui.allocate_exact_size(
-            egui::Vec2::new(VIEWPORT_WIDTH, VIEWPORT_HEIGHT),
-            egui::Sense::drag(),
-        );
-        const FACTOR: f32 = 0.001;
-        // let rot = glam::Mat4::from_rotation_x(response.drag_motion().x * FACTOR)
-        //     * glam::Mat4::from_rotation_y(response.drag_motion().y * FACTOR);
-        let inv = self.view.inverse();
-        let x = inv * glam::vec4(0., 1., 0., 0.);
-        let y = inv * glam::vec4(1., 0., 0., 0.);
-        let rot = glam::Quat::from_axis_angle(x.truncate(), response.drag_motion().x * FACTOR)
-            * glam::Quat::from_axis_angle(y.truncate(), response.drag_motion().y * FACTOR);
-        self.view = self.view * glam::Mat4::from_quat(rot);
-        let mvp = self.mvp_mat();
-        // Clone locals so we can move them into the paint callback:
-        let rotating_triangle = self.rotating_triangle.clone();
-        let callback = egui::PaintCallback {
-            rect,
-            callback: std::sync::Arc::new(egui_glow::CallbackFn::new(move |_info, painter| {
-                rotating_triangle.lock().paint(painter.gl(), mvp);
-            })),
+            normals: Some(vnormals.iter().map(|n| vec3(n.x, n.y, n.z)).collect()),
+            ..Default::default()
         };
-        ui.painter().add(callback);
-    }
-}
-
-struct RotatingTriangle {
-    program: glow::Program,
-    vertex_array: glow::VertexArray,
-}
-
-impl RotatingTriangle {
-    fn new(gl: &glow::Context) -> Self {
-        use glow::HasContext as _;
-        unsafe {
-            let program = gl.create_program().expect("Cannot create program");
-            let (vertex_shader_source, fragment_shader_source) = (
-                include_str!("shaders/vertex.glsl"),
-                include_str!("shaders/fragment.glsl"),
-            );
-            let shader_sources = [
-                (glow::VERTEX_SHADER, vertex_shader_source),
-                (glow::FRAGMENT_SHADER, fragment_shader_source),
-            ];
-            let shaders: Vec<_> = shader_sources
-                .iter()
-                .map(|(shader_type, shader_source)| {
-                    let shader = gl
-                        .create_shader(*shader_type)
-                        .expect("Cannot create shader");
-                    gl.shader_source(shader, shader_source);
-                    gl.compile_shader(shader);
-                    assert!(
-                        gl.get_shader_compile_status(shader),
-                        "Failed to compile {shader_type}: {}",
-                        gl.get_shader_info_log(shader)
-                    );
-                    gl.attach_shader(program, shader);
-                    shader
-                })
-                .collect();
-            gl.link_program(program);
-            assert!(
-                gl.get_program_link_status(program),
-                "{}",
-                gl.get_program_info_log(program)
-            );
-            for shader in shaders {
-                gl.detach_shader(program, shader);
-                gl.delete_shader(shader);
-            }
-            let vertex_array = gl
-                .create_vertex_array()
-                .expect("Cannot create vertex array");
-            Self {
-                program,
-                vertex_array,
-            }
+        let model_material = PhysicalMaterial::new_opaque(
+            &context,
+            &CpuMaterial {
+                albedo: Srgba::new_opaque(200, 200, 200),
+                roughness: 0.7,
+                metallic: 0.8,
+                ..Default::default()
+            },
+        );
+        (
+            Gm::new(Mesh::new(&context, &cpumesh), model_material),
+            Instances {
+                transformations: mesh
+                    .edges()
+                    .map(|e| {
+                        let h = mesh.edge_halfedge(e, false);
+                        let mut ev = mesh.calc_halfedge_vector(h, &points);
+                        let length = ev.length();
+                        ev /= length;
+                        let ev = vec3(ev.x, ev.y, ev.z);
+                        let start = points[mesh.from_vertex(h).index() as usize];
+                        let start = vec3(start.x, start.y, start.z);
+                        Mat4::from_translation(start)
+                            * Into::<Mat4>::into(Quat::from_arc(vec3(1.0, 0., 0.0), ev, None))
+                            * Mat4::from_nonuniform_scale(length, 1., 1.)
+                    })
+                    .collect(),
+                ..Default::default()
+            },
+            Instances {
+                transformations: points
+                    .iter()
+                    .map(|pos| Mat4::from_translation(vec3(pos.x, pos.y, pos.z)))
+                    .collect(),
+                ..Default::default()
+            },
+        )
+    };
+    let mut wireframe_material = PhysicalMaterial::new_opaque(
+        &context,
+        &CpuMaterial {
+            albedo: Srgba::new_opaque(220, 50, 50),
+            roughness: 0.7,
+            metallic: 0.8,
+            ..Default::default()
+        },
+    );
+    wireframe_material.render_states.cull = Cull::Back;
+    let mut sphere = CpuMesh::sphere(8);
+    sphere.transform(&Mat4::from_scale(0.005)).unwrap();
+    let vertices = Gm::new(
+        InstancedMesh::new(&context, &vtransforms, &sphere),
+        wireframe_material.clone(),
+    );
+    let mut cylinder = CpuMesh::cylinder(10);
+    cylinder
+        .transform(&Mat4::from_nonuniform_scale(1.0, 0.002, 0.002))
+        .unwrap();
+    let edges = Gm::new(
+        InstancedMesh::new(&context, &etransforms, &cylinder),
+        wireframe_material,
+    );
+    let ambient = AmbientLight::new(&context, 0.7, Srgba::WHITE);
+    let directional0 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(-1.0, -1.0, -1.0));
+    let directional1 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(1.0, 1.0, 1.0));
+    // render loop
+    window.render_loop(move |mut frame_input| {
+        let mut redraw = frame_input.first_frame;
+        redraw |= camera.set_viewport(frame_input.viewport);
+        redraw |= control.handle_events(&mut camera, &mut frame_input.events);
+        if redraw {
+            frame_input
+                .screen()
+                .clear(ClearState::color_and_depth(0.1, 0.1, 0.1, 1.0, 1.0))
+                .render(
+                    &camera,
+                    model.into_iter().chain(&vertices).chain(&edges),
+                    &[&ambient, &directional0, &directional1],
+                );
         }
-    }
-
-    fn destroy(&self, gl: &glow::Context) {
-        use glow::HasContext as _;
-        unsafe {
-            gl.delete_program(self.program);
-            gl.delete_vertex_array(self.vertex_array);
+        FrameOutput {
+            swap_buffers: redraw,
+            ..Default::default()
         }
-    }
-
-    fn paint(&self, gl: &glow::Context, mvp: glam::Mat4) {
-        use glow::HasContext as _;
-        unsafe {
-            gl.use_program(Some(self.program));
-            gl.uniform_matrix_4_f32_slice(
-                gl.get_uniform_location(self.program, "u_mvp").as_ref(),
-                false,
-                &mvp.to_cols_array(),
-            );
-            gl.bind_vertex_array(Some(self.vertex_array));
-            gl.polygon_mode(glow::FRONT_AND_BACK, glow::FILL);
-            gl.disable(glow::POLYGON_OFFSET_FILL);
-            gl.draw_arrays(glow::TRIANGLES, 0, 9);
-        }
-    }
+    });
 }
