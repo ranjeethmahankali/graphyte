@@ -1,6 +1,5 @@
-use std::path::PathBuf;
-
 use alum::{element::Handle, PolyMeshF32};
+use std::path::PathBuf;
 use three_d::{
     degrees, vec3, AmbientLight, Camera, ClearState, CpuMaterial, CpuMesh, Cull, DirectionalLight,
     FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, OrbitControl,
@@ -15,9 +14,25 @@ pub fn main() {
     })
     .unwrap();
     let context = window.gl();
-
+    let mesh = {
+        let mut mesh =
+            PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
+                .expect("Cannot load obj");
+        {
+            let mut points = mesh.points();
+            let mut points = points.try_borrow_mut().expect("Cannot borrow points");
+            for p in points.iter_mut() {
+                *p = *p * 10.; // Scale the mesh.
+            }
+        }
+        mesh.update_face_normals()
+            .expect("Cannot update face normals");
+        mesh.update_vertex_normals_fast()
+            .expect("Cannot update vertex normals");
+        mesh
+    };
     let target = vec3(0.0, 1.0, 0.0);
-    let scene_radius = 6.0;
+    let scene_radius: f32 = 6.0;
     let mut camera = Camera::new_perspective(
         window.viewport(),
         target + scene_radius * vec3(0.6, 0.3, 1.0).normalize(),
@@ -30,23 +45,6 @@ pub fn main() {
     let mut control = OrbitControl::new(*camera.target(), 0.1 * scene_radius, 100.0 * scene_radius);
     // Create a CPU-side mesh consisting of a single colored triangle
     let (model, etransforms, vtransforms) = {
-        let mesh = {
-            let mut mesh =
-                PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
-                    .expect("Cannot load obj");
-            {
-                let mut points = mesh.points();
-                let mut points = points.try_borrow_mut().expect("Cannot borrow points");
-                for p in points.iter_mut() {
-                    *p = *p * 10.; // Scale the mesh.
-                }
-            }
-            mesh.update_face_normals()
-                .expect("Cannot update face normals");
-            mesh.update_vertex_normals_fast()
-                .expect("Cannot update vertex normals");
-            mesh
-        };
         let points = mesh.points();
         let points = points.try_borrow().expect("Cannot borrow points");
         let vnormals = mesh.vertex_normals().expect("Cannot borrow vertex normals");
