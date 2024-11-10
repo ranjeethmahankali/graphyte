@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-egui = "0.28"
-eframe = "0.28"
-glam = "0.8.5"
+glam = "0.29.2"
 alum = { git = "https://github.com/ranjeethmahankali/alum", branch = "bump" }
+three-d = "0.17.0"
