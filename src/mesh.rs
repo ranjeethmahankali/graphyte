@@ -1,4 +1,4 @@
-use alum::mesh::{
+use alum::{
     Adaptor, CrossProductAdaptor, DotProductAdaptor, FloatScalarAdaptor, PolyMeshT,
     VectorAngleAdaptor, VectorLengthAdaptor, VectorNormalizeAdaptor,
 };
