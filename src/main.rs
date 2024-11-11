@@ -11,6 +11,19 @@ use three_d::{
     Positions, Quat, Srgba, Window, WindowSettings,
 };
 
+fn bunny_mesh() -> PolyMesh {
+    let mesh = PolyMesh::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
+        .expect("Cannot load obj");
+    {
+        let mut points = mesh.points();
+        let mut points = points.try_borrow_mut().expect("Cannot borrow points");
+        for p in points.iter_mut() {
+            *p = *p * 10.; // Scale the mesh.
+        }
+    }
+    mesh
+}
+
 pub fn main() {
     let window = Window::new(WindowSettings {
         title: "Viewer".to_string(),
@@ -21,16 +34,7 @@ pub fn main() {
     let context = window.gl();
     let mesh = {
         // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
-        let mut mesh =
-            PolyMesh::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
-                .expect("Cannot load obj");
-        {
-            let mut points = mesh.points();
-            let mut points = points.try_borrow_mut().expect("Cannot borrow points");
-            for p in points.iter_mut() {
-                *p = *p * 10.; // Scale the mesh.
-            }
-        }
+        let mut mesh = bunny_mesh();
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
