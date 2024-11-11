@@ -1,7 +1,7 @@
 mod mesh;
 mod scene;
 
-use alum::element::Handle;
+use alum::Handle;
 use mesh::PolyMesh;
 use scene::CameraMouseControl;
 use std::path::PathBuf;

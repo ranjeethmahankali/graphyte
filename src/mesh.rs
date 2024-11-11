@@ -1,9 +1,6 @@
-use alum::{
-    adaptor::{
-        Adaptor, CrossProductAdaptor, DotProductAdaptor, FloatScalarAdaptor, VectorAngleAdaptor,
-        VectorLengthAdaptor, VectorNormalizeAdaptor,
-    },
-    mesh::PolyMeshT,
+use alum::mesh::{
+    Adaptor, CrossProductAdaptor, DotProductAdaptor, FloatScalarAdaptor, PolyMeshT,
+    VectorAngleAdaptor, VectorLengthAdaptor, VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
 
