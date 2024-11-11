@@ -1,6 +1,7 @@
 mod mesh;
 mod scene;
 
+use alum::element::Handle;
 use mesh::PolyMesh;
 use scene::CameraMouseControl;
 use std::path::PathBuf;
@@ -19,20 +20,17 @@ pub fn main() {
     .unwrap();
     let context = window.gl();
     let mesh = {
+        // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
         let mut mesh =
             PolyMesh::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
-                .expect("Cannot load obj file");
-        // let mut mesh = PolyMeshF32::icosahedron(1.0).expect("Cannoto create icosahedron");
-        // let mut mesh =
-        //     PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
-        //         .expect("Cannot load obj");
-        // {
-        //     let mut points = mesh.points();
-        //     let mut points = points.try_borrow_mut().expect("Cannot borrow points");
-        //     for p in points.iter_mut() {
-        //         *p = *p * 10.; // Scale the mesh.
-        //     }
-        // }
+                .expect("Cannot load obj");
+        {
+            let mut points = mesh.points();
+            let mut points = points.try_borrow_mut().expect("Cannot borrow points");
+            for p in points.iter_mut() {
+                *p = *p * 10.; // Scale the mesh.
+            }
+        }
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
@@ -86,7 +84,7 @@ pub fn main() {
                     .map(|e| {
                         let h = mesh.edge_halfedge(e, false);
                         let mut ev = mesh.calc_halfedge_vector(h, &points);
-                        let length = ev.length();
+                        let length = ev.magnitude();
                         ev /= length;
                         let ev = vec3(ev.x, ev.y, ev.z);
                         let start = points[mesh.from_vertex(h).index() as usize];
