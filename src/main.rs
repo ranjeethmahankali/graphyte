@@ -1,7 +1,9 @@
+mod mesh;
 mod scene;
 
-use alum::{element::Handle, PolyMeshF32};
+use mesh::PolyMesh;
 use scene::CameraMouseControl;
+use std::path::PathBuf;
 use three_d::{
     degrees, vec3, AmbientLight, Camera, ClearState, CpuMaterial, CpuMesh, Cull, DirectionalLight,
     FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, PhysicalMaterial,
@@ -17,7 +19,10 @@ pub fn main() {
     .unwrap();
     let context = window.gl();
     let mesh = {
-        let mut mesh = PolyMeshF32::icosahedron(1.0).expect("Cannoto create icosahedron");
+        let mut mesh =
+            PolyMesh::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
+                .expect("Cannot load obj file");
+        // let mut mesh = PolyMeshF32::icosahedron(1.0).expect("Cannoto create icosahedron");
         // let mut mesh =
         //     PolyMeshF32::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
         //         .expect("Cannot load obj");
