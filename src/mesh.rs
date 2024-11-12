@@ -100,7 +100,7 @@ mod test {
 
     macro_rules! assert_f32_eq {
         ($a:expr, $b:expr, $eps:expr, $debug:expr) => {
-            $crate::macros::assert_float_eq!($a, $b, $eps, $debug)
+            assert_float_eq!($a, $b, $eps, $debug)
         };
         ($a:expr, $b:expr, $eps:expr) => {
             assert_float_eq!($a, $b, $eps)
