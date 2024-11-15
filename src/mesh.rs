@@ -69,6 +69,8 @@ pub type PolyMesh = PolyMeshT<3, MeshAdaptor>;
 #[cfg(test)]
 mod test {
 
+    use alum::HasTopology;
+
     use super::PolyMesh;
 
     macro_rules! assert_float_eq {

@@ -1,7 +1,7 @@
 mod mesh;
 mod scene;
 
-use alum::Handle;
+use alum::{Handle, HasTopology};
 use mesh::PolyMesh;
 use scene::CameraMouseControl;
 use std::{path::PathBuf, time::Instant};
@@ -95,12 +95,12 @@ pub fn main() {
                 transformations: mesh
                     .edges()
                     .map(|e| {
-                        let h = mesh.edge_halfedge(e, false);
+                        let h = e.halfedge(false);
                         let mut ev = mesh.calc_halfedge_vector(h, &points);
                         let length = ev.magnitude();
                         ev /= length;
                         let ev = vec3(ev.x, ev.y, ev.z);
-                        let start = points[mesh.tail_vertex(h).index() as usize];
+                        let start = points[h.tail(&mesh).index() as usize];
                         let start = vec3(start.x, start.y, start.z);
                         Mat4::from_translation(start)
                             * Into::<Mat4>::into(Quat::from_arc(vec3(1.0, 0., 0.0), ev, None))
