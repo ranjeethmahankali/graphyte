@@ -35,6 +35,8 @@ pub fn main() {
     let mesh = {
         // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
         let mut mesh = bunny_mesh();
+        mesh.subidivide_catmull_clark(3, true)
+            .expect("Failed to subdivide");
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
@@ -91,7 +93,7 @@ pub fn main() {
                         let length = ev.magnitude();
                         ev /= length;
                         let ev = vec3(ev.x, ev.y, ev.z);
-                        let start = points[mesh.from_vertex(h).index() as usize];
+                        let start = points[mesh.tail_vertex(h).index() as usize];
                         let start = vec3(start.x, start.y, start.z);
                         Mat4::from_translation(start)
                             * Into::<Mat4>::into(Quat::from_arc(vec3(1.0, 0., 0.0), ev, None))
@@ -120,14 +122,14 @@ pub fn main() {
     );
     wireframe_material.render_states.cull = Cull::Back;
     let mut sphere = CpuMesh::sphere(8);
-    sphere.transform(&Mat4::from_scale(0.005)).unwrap();
+    sphere.transform(&Mat4::from_scale(0.001)).unwrap();
     let vertices = Gm::new(
         InstancedMesh::new(&context, &vtransforms, &sphere),
         wireframe_material.clone(),
     );
     let mut cylinder = CpuMesh::cylinder(10);
     cylinder
-        .transform(&Mat4::from_nonuniform_scale(1.0, 0.002, 0.002))
+        .transform(&Mat4::from_nonuniform_scale(1.0, 0.0005, 0.0005))
         .unwrap();
     let edges = Gm::new(
         InstancedMesh::new(&context, &etransforms, &cylinder),
