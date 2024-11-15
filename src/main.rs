@@ -4,7 +4,7 @@ mod scene;
 use alum::Handle;
 use mesh::PolyMesh;
 use scene::CameraMouseControl;
-use std::path::PathBuf;
+use std::{path::PathBuf, time::Instant};
 use three_d::{
     degrees, vec3, AmbientLight, Camera, ClearState, CpuMaterial, CpuMesh, Cull, DirectionalLight,
     FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh, PhysicalMaterial,
@@ -35,8 +35,11 @@ pub fn main() {
     let mesh = {
         // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
         let mut mesh = bunny_mesh();
+        let before = Instant::now();
         mesh.subidivide_catmull_clark(3, true)
             .expect("Failed to subdivide");
+        let duration = Instant::now() - before;
+        println!("Subdivision took {}ms", duration.as_millis());
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
