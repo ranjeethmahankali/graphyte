@@ -36,10 +36,14 @@ pub fn main() {
         // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
         let mut mesh = bunny_mesh();
         let before = Instant::now();
-        mesh.subidivide_catmull_clark(3, true)
+        mesh.subdivide_catmull_clark(3, true)
             .expect("Failed to subdivide");
         let duration = Instant::now() - before;
         println!("Subdivision took {}ms", duration.as_millis());
+        println!(
+            "This mesh has {} boundary vertices.",
+            mesh.vertices().filter(|v| v.is_boundary(&mesh)).count()
+        );
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
