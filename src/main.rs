@@ -144,7 +144,7 @@ pub fn main() {
         mesh
     };
     let refbox = {
-        let mut mesh = PolyMesh::unit_box().expect("Cannot make a box");
+        let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannot make icosahedron");
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
@@ -181,7 +181,6 @@ pub fn main() {
                 .render(
                     &camera,
                     model.into_iter().chain(&vertices).chain(&edges),
-                    // vertices.into_iter().chain(&edges).chain(&rvs).chain(&res),
                     &[&ambient, &directional0, &directional1],
                 );
         }
