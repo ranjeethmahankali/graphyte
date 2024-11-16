@@ -1,7 +1,7 @@
 mod mesh;
 mod scene;
 
-use alum::{Handle, HasTopology};
+use alum::{Handle, HasIterators, HasTopology};
 use mesh::PolyMesh;
 use scene::CameraMouseControl;
 use std::{path::PathBuf, time::Instant};
@@ -34,10 +34,10 @@ pub fn main() {
     let context = window.gl();
     let mesh = {
         // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
-        let mut mesh = bunny_mesh();
+        // let mut mesh = bunny_mesh();
+        let mut mesh = PolyMesh::unit_box().expect("Cannot make a box");
         let before = Instant::now();
-        mesh.subdivide_catmull_clark(3, true)
-            .expect("Failed to subdivide");
+        mesh.subdivide_loop(1, false).expect("Cannot do subd");
         let duration = Instant::now() - before;
         println!("Subdivision took {}ms", duration.as_millis());
         println!(

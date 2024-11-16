@@ -69,7 +69,7 @@ pub type PolyMesh = PolyMeshT<3, MeshAdaptor>;
 #[cfg(test)]
 mod test {
 
-    use alum::HasTopology;
+    use alum::{HasIterators, HasTopology};
 
     use super::PolyMesh;
 
