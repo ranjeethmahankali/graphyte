@@ -126,17 +126,14 @@ pub fn main() {
     let context = window.gl();
     let mesh = {
         // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
-        // let mut mesh = bunny_mesh();
+        let mut mesh = bunny_mesh();
         // let mut mesh = PolyMesh::unit_box().expect("Cannot make a box");
-        let mut mesh =
-            PolyMesh::load_obj(&PathBuf::from("/home/rnjth94/dev/quarrot/temp/subdiv.obj"))
-                .expect("Cannot load obj");
-        // let before = Instant::now();
-        // mesh.subdivide_loop(3, true).expect("Cannot do subd");
-        // // mesh.subdivide_catmull_clark(3, true)
-        // //     .expect("Cannot subdivide");
-        // let duration = Instant::now() - before;
-        // println!("Subdivision took {}ms", duration.as_millis());
+        let before = Instant::now();
+        mesh.subdiv_sqrt3(3, false).expect("Cannot do subd");
+        // mesh.subdivide_catmull_clark(3, true)
+        //     .expect("Cannot subdivide");
+        let duration = Instant::now() - before;
+        println!("Subdivision took {}ms", duration.as_millis());
         println!(
             "This mesh has {} boundary vertices.",
             mesh.vertices().filter(|v| v.is_boundary(&mesh)).count()
