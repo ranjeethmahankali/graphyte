@@ -32,8 +32,8 @@ fn visualize_mesh(
     Gm<InstancedMesh, PhysicalMaterial>,
     Gm<InstancedMesh, PhysicalMaterial>,
 ) {
-    const CYL_RADIUS: f32 = 0.001;
-    const SPH_RADIUS: f32 = 0.002;
+    const CYL_RADIUS: f32 = 0.0005;
+    const SPH_RADIUS: f32 = 0.001;
     // Create a CPU-side mesh consisting of a single colored triangle
     let (model, etransforms, vtransforms) = {
         let points = mesh.points();
@@ -125,13 +125,18 @@ pub fn main() {
     .unwrap();
     let context = window.gl();
     let mesh = {
-        let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
+        // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
         // let mut mesh = bunny_mesh();
         // let mut mesh = PolyMesh::unit_box().expect("Cannot make a box");
-        let before = Instant::now();
-        mesh.subdivide_loop(3, true).expect("Cannot do subd");
-        let duration = Instant::now() - before;
-        println!("Subdivision took {}ms", duration.as_millis());
+        let mut mesh =
+            PolyMesh::load_obj(&PathBuf::from("/home/rnjth94/dev/quarrot/temp/subdiv.obj"))
+                .expect("Cannot load obj");
+        // let before = Instant::now();
+        // mesh.subdivide_loop(3, true).expect("Cannot do subd");
+        // // mesh.subdivide_catmull_clark(3, true)
+        // //     .expect("Cannot subdivide");
+        // let duration = Instant::now() - before;
+        // println!("Subdivision took {}ms", duration.as_millis());
         println!(
             "This mesh has {} boundary vertices.",
             mesh.vertices().filter(|v| v.is_boundary(&mesh)).count()
@@ -143,14 +148,14 @@ pub fn main() {
         mesh.check_topology().expect("Topological errors found");
         mesh
     };
-    let refbox = {
-        let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannot make icosahedron");
-        mesh.update_face_normals()
-            .expect("Cannot update face normals");
-        mesh.update_vertex_normals_fast()
-            .expect("Cannot update vertex normals");
-        mesh
-    };
+    // let refbox = {
+    //     let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannot make icosahedron");
+    //     mesh.update_face_normals()
+    //         .expect("Cannot update face normals");
+    //     mesh.update_vertex_normals_fast()
+    //         .expect("Cannot update vertex normals");
+    //     mesh
+    // };
     let target = vec3(0.0, 1.0, 0.0);
     let scene_radius: f32 = 6.0;
     let mut camera = Camera::new_perspective(
@@ -165,7 +170,7 @@ pub fn main() {
     let mut control =
         CameraMouseControl::new(*camera.target(), 0.1 * scene_radius, 100.0 * scene_radius);
     let (model, vertices, edges) = visualize_mesh(&mesh, &context);
-    let (_, rvs, res) = visualize_mesh(&refbox, &context);
+    // let (_, rvs, res) = visualize_mesh(&refbox, &context);
     let ambient = AmbientLight::new(&context, 0.7, Srgba::WHITE);
     let directional0 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(-1.0, -1.0, -1.0));
     let directional1 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(1.0, 1.0, 1.0));
