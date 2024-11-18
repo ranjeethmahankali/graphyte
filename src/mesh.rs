@@ -1,6 +1,7 @@
 use alum::{
     Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor, EdgeLengthDecimater,
-    FloatScalarAdaptor, PolyMeshT, VectorAngleAdaptor, VectorLengthAdaptor, VectorNormalizeAdaptor,
+    FloatScalarAdaptor, HasTopology, PolyMeshT, VectorAngleAdaptor, VectorLengthAdaptor,
+    VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
 
@@ -92,12 +93,21 @@ impl Decimater<PolyMesh> for ExperimentDecimater {
     }
 
     fn before_collapse(&mut self, mesh: &PolyMesh, h: alum::HH) -> Result<(), alum::Error> {
+        println!("Before collapse {}", self.history.len() + 1);
         self.inner.before_collapse(mesh, h)
     }
 
-    fn after_collapse(&mut self, mesh: &mut PolyMesh, v: alum::VH) -> Result<(), alum::Error> {
+    fn after_collapse(&mut self, mesh: &PolyMesh, v: alum::VH) -> Result<(), alum::Error> {
         self.inner.after_collapse(mesh, v)?;
-        self.history.push(mesh.clone());
+        let mut copy = mesh.clone();
+        copy.garbage_collection()?;
+        let nfaces = copy.num_faces();
+        self.history.push(copy);
+        println!(
+            "After collapse {} the mesh has {} faces",
+            self.history.len(),
+            nfaces,
+        );
         Ok(())
     }
 }
