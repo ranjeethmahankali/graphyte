@@ -1,6 +1,6 @@
 use alum::{
-    Adaptor, CrossProductAdaptor, DotProductAdaptor, FloatScalarAdaptor, PolyMeshT,
-    VectorAngleAdaptor, VectorLengthAdaptor, VectorNormalizeAdaptor,
+    Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor, EdgeLengthDecimater,
+    FloatScalarAdaptor, PolyMeshT, VectorAngleAdaptor, VectorLengthAdaptor, VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
 
@@ -65,6 +65,42 @@ impl VectorAngleAdaptor for MeshAdaptor {
 }
 
 pub type PolyMesh = PolyMeshT<3, MeshAdaptor>;
+
+pub struct ExperimentDecimater {
+    inner: EdgeLengthDecimater<3, MeshAdaptor>,
+    history: Vec<PolyMesh>,
+}
+
+impl ExperimentDecimater {
+    pub fn new(maxlen: f32) -> Self {
+        ExperimentDecimater {
+            inner: EdgeLengthDecimater::new(maxlen),
+            history: Vec::new(),
+        }
+    }
+
+    pub fn history(&self) -> &[PolyMesh] {
+        &self.history
+    }
+}
+
+impl Decimater<PolyMesh> for ExperimentDecimater {
+    type Cost = f32;
+
+    fn collapse_cost(&self, mesh: &PolyMesh, h: alum::HH) -> Option<Self::Cost> {
+        self.inner.collapse_cost(mesh, h)
+    }
+
+    fn before_collapse(&mut self, mesh: &PolyMesh, h: alum::HH) -> Result<(), alum::Error> {
+        self.inner.before_collapse(mesh, h)
+    }
+
+    fn after_collapse(&mut self, mesh: &mut PolyMesh, v: alum::VH) -> Result<(), alum::Error> {
+        self.inner.after_collapse(mesh, v)?;
+        self.history.push(mesh.clone());
+        Ok(())
+    }
+}
 
 #[cfg(test)]
 mod test {

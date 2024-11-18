@@ -1,8 +1,8 @@
 mod mesh;
 mod scene;
 
-use alum::{Handle, HasIterators, HasTopology};
-use mesh::PolyMesh;
+use alum::{Handle, HasDecimation, HasIterators, HasTopology};
+use mesh::{ExperimentDecimater, PolyMesh};
 use scene::CameraMouseControl;
 use std::{path::PathBuf, time::Instant};
 use three_d::{
@@ -124,20 +124,8 @@ pub fn main() {
     })
     .unwrap();
     let context = window.gl();
-    let mesh = {
-        // let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannoto create icosahedron");
+    let mut mesh = {
         let mut mesh = bunny_mesh();
-        // let mut mesh = PolyMesh::unit_box().expect("Cannot make a box");
-        let before = Instant::now();
-        mesh.subdiv_sqrt3(3, false).expect("Cannot do subd");
-        // mesh.subdivide_catmull_clark(3, true)
-        //     .expect("Cannot subdivide");
-        let duration = Instant::now() - before;
-        println!("Subdivision took {}ms", duration.as_millis());
-        println!(
-            "This mesh has {} boundary vertices.",
-            mesh.vertices().filter(|v| v.is_boundary(&mesh)).count()
-        );
         mesh.update_face_normals()
             .expect("Cannot update face normals");
         mesh.update_vertex_normals_fast()
@@ -145,14 +133,9 @@ pub fn main() {
         mesh.check_topology().expect("Topological errors found");
         mesh
     };
-    // let refbox = {
-    //     let mut mesh = PolyMesh::icosahedron(1.0).expect("Cannot make icosahedron");
-    //     mesh.update_face_normals()
-    //         .expect("Cannot update face normals");
-    //     mesh.update_vertex_normals_fast()
-    //         .expect("Cannot update vertex normals");
-    //     mesh
-    // };
+    let mut decimater = ExperimentDecimater::new(0.1);
+    mesh.decimate(&mut decimater, 100).expect("Cannot decimate");
+    let history = decimater.history();
     let target = vec3(0.0, 1.0, 0.0);
     let scene_radius: f32 = 6.0;
     let mut camera = Camera::new_perspective(
@@ -166,23 +149,39 @@ pub fn main() {
     );
     let mut control =
         CameraMouseControl::new(*camera.target(), 0.1 * scene_radius, 100.0 * scene_radius);
-    let (model, vertices, edges) = visualize_mesh(&mesh, &context);
+    let views: Vec<(
+        Gm<Mesh, PhysicalMaterial>,
+        Gm<InstancedMesh, PhysicalMaterial>,
+        Gm<InstancedMesh, PhysicalMaterial>,
+    )> = history
+        .iter()
+        .map(|mesh| visualize_mesh(&mesh, &context))
+        .collect();
     // let (_, rvs, res) = visualize_mesh(&refbox, &context);
     let ambient = AmbientLight::new(&context, 0.7, Srgba::WHITE);
     let directional0 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(-1.0, -1.0, -1.0));
     let directional1 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(1.0, 1.0, 1.0));
+    let mut prev = Instant::now();
+    let mut index = 0usize;
     // render loop
     window.render_loop(move |mut frame_input| {
         let mut redraw = frame_input.first_frame;
         redraw |= camera.set_viewport(frame_input.viewport);
         redraw |= control.handle_events(&mut camera, &mut frame_input.events);
+        let now = Instant::now();
+        if (now - prev).as_secs() >= 1 {
+            redraw = true;
+            index = (index + 1) % views.len();
+            prev = now;
+        }
+        let (model, vertices, edges) = &views[index];
         if redraw {
             frame_input
                 .screen()
                 .clear(ClearState::color_and_depth(0.1, 0.1, 0.1, 1.0, 1.0))
                 .render(
                     &camera,
-                    model.into_iter().chain(&vertices).chain(&edges),
+                    model.into_iter().chain(vertices).chain(edges),
                     &[&ambient, &directional0, &directional1],
                 );
         }
