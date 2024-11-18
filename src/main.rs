@@ -134,7 +134,7 @@ pub fn main() {
         mesh
     };
     let mut decimater = ExperimentDecimater::new(0.1);
-    const NUM_COLLAPSES: usize = 2000;
+    const NUM_COLLAPSES: usize = 3000;
     mesh.decimate(&mut decimater, NUM_COLLAPSES)
         .expect("Cannot decimate");
     let history = decimater.history();
@@ -171,7 +171,7 @@ pub fn main() {
         redraw |= camera.set_viewport(frame_input.viewport);
         redraw |= control.handle_events(&mut camera, &mut frame_input.events);
         let now = Instant::now();
-        if (now - prev).as_millis() >= 50 {
+        if (now - prev).as_millis() >= 10 {
             redraw = true;
             index = (index + 1) % views.len();
             prev = now;
