@@ -135,8 +135,13 @@ pub fn main() {
     };
     let mut decimater = ExperimentDecimater::new(0.1);
     const NUM_COLLAPSES: usize = 3000;
+    let before = Instant::now();
     mesh.decimate(&mut decimater, NUM_COLLAPSES)
         .expect("Cannot decimate");
+    println!(
+        "Decimation took {}ms",
+        (Instant::now() - before).as_millis()
+    );
     let history = decimater.history();
     let target = vec3(0.0, 1.0, 0.0);
     let scene_radius: f32 = 6.0;

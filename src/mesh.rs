@@ -92,10 +92,6 @@ impl Decimater<PolyMesh> for ExperimentDecimater {
     }
 
     fn before_collapse(&mut self, mesh: &PolyMesh, h: alum::HH) -> Result<(), alum::Error> {
-        println!(
-            "Collapsing edge of squared length: {}",
-            mesh.try_calc_edge_length_sqr(h.edge())?
-        );
         self.inner.before_collapse(mesh, h)
     }
 
