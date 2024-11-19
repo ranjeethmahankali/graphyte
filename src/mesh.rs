@@ -1,6 +1,7 @@
 use alum::{
     Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor, EdgeLengthDecimater,
-    FloatScalarAdaptor, PolyMeshT, VectorAngleAdaptor, VectorLengthAdaptor, VectorNormalizeAdaptor,
+    FloatScalarAdaptor, Handle, HasIterators, PolyMeshT, VectorAngleAdaptor, VectorLengthAdaptor,
+    VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
 
@@ -69,6 +70,7 @@ pub type PolyMesh = PolyMeshT<3, MeshAdaptor>;
 pub struct ExperimentDecimater {
     inner: EdgeLengthDecimater<3, MeshAdaptor>,
     history: Vec<PolyMesh>,
+    mid_point: Vec3,
 }
 
 impl ExperimentDecimater {
@@ -76,6 +78,7 @@ impl ExperimentDecimater {
         ExperimentDecimater {
             inner: EdgeLengthDecimater::new(maxlen),
             history: Vec::new(),
+            mid_point: Vec3::unit_x(),
         }
     }
 
@@ -92,11 +95,29 @@ impl Decimater<PolyMesh> for ExperimentDecimater {
     }
 
     fn before_collapse(&mut self, mesh: &PolyMesh, h: alum::HH) -> Result<(), alum::Error> {
-        self.inner.before_collapse(mesh, h)
+        self.inner.before_collapse(mesh, h)?;
+        let points = mesh.points();
+        let points = points.try_borrow()?;
+        self.mid_point =
+            (points[h.tail(mesh).index() as usize] + points[h.head(mesh).index() as usize]) * 0.5;
+        Ok(())
     }
 
     fn after_collapse(&mut self, mesh: &PolyMesh, v: alum::VH) -> Result<(), alum::Error> {
         self.inner.after_collapse(mesh, v)?;
+        if let Some(mut fnormals) = mesh.face_normals() {
+            let mut fnormals = fnormals.try_borrow_mut()?;
+            let mut points = mesh.points();
+            let mut points = points.try_borrow_mut()?;
+            points[v.index() as usize] = self.mid_point;
+            for f in mesh.vf_ccw_iter(v) {
+                fnormals[f.index() as usize] = mesh.calc_face_normal(f, &points);
+            }
+            if let Some(mut vnormals) = mesh.vertex_normals() {
+                let mut vnormals = vnormals.try_borrow_mut()?;
+                vnormals[v.index() as usize] = mesh.calc_vertex_normal_fast(v, &fnormals);
+            }
+        }
         let mut copy = mesh.clone();
         copy.garbage_collection()?;
         self.history.push(copy);

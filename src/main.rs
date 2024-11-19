@@ -7,8 +7,8 @@ use scene::CameraMouseControl;
 use std::{path::PathBuf, time::Instant};
 use three_d::{
     degrees, vec3, AmbientLight, Camera, ClearState, Context, CpuMaterial, CpuMesh, Cull,
-    DirectionalLight, FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh,
-    PhysicalMaterial, Positions, Quat, Srgba, Window, WindowSettings,
+    DirectionalLight, Event, FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Key,
+    Mat4, Mesh, PhysicalMaterial, Positions, Quat, Srgba, Window, WindowSettings,
 };
 
 fn bunny_mesh() -> PolyMesh {
@@ -133,7 +133,7 @@ pub fn main() {
         mesh.check_topology().expect("Topological errors found");
         mesh
     };
-    let mut decimater = ExperimentDecimater::new(0.1);
+    let mut decimater = ExperimentDecimater::new(2.5);
     const NUM_COLLAPSES: usize = 3000;
     let before = Instant::now();
     mesh.decimate(&mut decimater, NUM_COLLAPSES)
@@ -168,18 +168,32 @@ pub fn main() {
     let ambient = AmbientLight::new(&context, 0.7, Srgba::WHITE);
     let directional0 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(-1.0, -1.0, -1.0));
     let directional1 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(1.0, 1.0, 1.0));
-    let mut prev = Instant::now();
     let mut index = 0usize;
     // render loop
     window.render_loop(move |mut frame_input| {
         let mut redraw = frame_input.first_frame;
         redraw |= camera.set_viewport(frame_input.viewport);
         redraw |= control.handle_events(&mut camera, &mut frame_input.events);
-        let now = Instant::now();
-        if (now - prev).as_millis() >= 10 {
-            redraw = true;
-            index = (index + 1) % views.len();
-            prev = now;
+        for event in &frame_input.events {
+            let next = usize::clamp(
+                match event {
+                    Event::KeyPress { kind, .. } => match kind {
+                        Key::ArrowDown => index + 1,
+                        Key::ArrowUp => index.saturating_sub(1),
+                        Key::R => 0,
+                        Key::PageUp => index.saturating_sub(10),
+                        Key::PageDown => index + 10,
+                        _ => index,
+                    },
+                    _ => index,
+                },
+                0,
+                views.len() - 1,
+            );
+            if next != index {
+                redraw = true;
+                index = next;
+            }
         }
         let (model, vertices, edges) = &views[index];
         if redraw {
