@@ -71,7 +71,7 @@ fn visualize_mesh(
                         let length = ev.magnitude();
                         ev /= length;
                         let ev = vec3(ev.x, ev.y, ev.z);
-                        let start = points[h.tail(mesh).index() as usize];
+                        let start = points[h.tail(mesh)];
                         let start = vec3(start.x, start.y, start.z);
                         Mat4::from_translation(start)
                             * Into::<Mat4>::into(Quat::from_arc(vec3(1.0, 0., 0.0), ev, None))

@@ -1,7 +1,7 @@
 use alum::{
     decimate::quadric::QuadricType, Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor,
-    FloatScalarAdaptor, PolyMeshT, QuadricDecimater, VectorAngleAdaptor, VectorLengthAdaptor,
-    VectorNormalizeAdaptor,
+    FloatScalarAdaptor, HasTopology, PolyMeshT, QuadricDecimater, VectorAngleAdaptor,
+    VectorLengthAdaptor, VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
 
@@ -102,6 +102,7 @@ impl Decimater<PolyMesh> for ExperimentDecimater {
         self.inner.after_collapse(mesh, v)?;
         let mut copy = mesh.clone();
         copy.garbage_collection()?;
+        copy.check_topology()?;
         self.history.push(copy);
         Ok(())
     }
