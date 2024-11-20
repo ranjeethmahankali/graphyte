@@ -1,6 +1,6 @@
 use alum::{
-    Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor, EdgeLengthDecimater,
-    FloatScalarAdaptor, Handle, HasIterators, PolyMeshT, VectorAngleAdaptor, VectorLengthAdaptor,
+    Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor, FloatScalarAdaptor, Handle,
+    HasIterators, PolyMeshT, QuadricDecimater, VectorAngleAdaptor, VectorLengthAdaptor,
     VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
@@ -68,15 +68,15 @@ impl VectorAngleAdaptor for MeshAdaptor {
 pub type PolyMesh = PolyMeshT<3, MeshAdaptor>;
 
 pub struct ExperimentDecimater {
-    inner: EdgeLengthDecimater<3, MeshAdaptor>,
+    inner: QuadricDecimater<MeshAdaptor>,
     history: Vec<PolyMesh>,
     mid_point: Vec3,
 }
 
 impl ExperimentDecimater {
-    pub fn new(maxlen: f32) -> Self {
+    pub fn new(mesh: &PolyMesh) -> Self {
         ExperimentDecimater {
-            inner: EdgeLengthDecimater::new(maxlen),
+            inner: QuadricDecimater::new(mesh).expect("Cannot create quadric decimater"),
             history: Vec::new(),
             mid_point: Vec3::unit_x(),
         }
@@ -91,7 +91,9 @@ impl Decimater<PolyMesh> for ExperimentDecimater {
     type Cost = f32;
 
     fn collapse_cost(&self, mesh: &PolyMesh, h: alum::HH) -> Option<Self::Cost> {
-        self.inner.collapse_cost(mesh, h)
+        let cost = self.inner.collapse_cost(mesh, h);
+        if let Some(cost) = cost {}
+        cost
     }
 
     fn before_collapse(&mut self, mesh: &PolyMesh, h: alum::HH) -> Result<(), alum::Error> {
