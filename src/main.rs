@@ -38,9 +38,6 @@ fn visualize_mesh(
     let (model, etransforms, vtransforms) = {
         let points = mesh.points();
         let points = points.try_borrow().expect("Cannot borrow points");
-        let (zmin, zmax) = points.iter().fold((f32::MAX, -f32::MAX), |(min, max), p| {
-            (f32::min(p.z, min), f32::max(p.z, max))
-        });
         let vnormals = mesh.vertex_normals().expect("Cannot borrow vertex normals");
         let vnormals = vnormals.try_borrow().expect("Cannot borrow vertex normals");
         let cpumesh = CpuMesh {
@@ -81,18 +78,6 @@ fn visualize_mesh(
                             * Mat4::from_nonuniform_scale(length, 1., 1.)
                     })
                     .collect(),
-                colors: Some(
-                    mesh.edges()
-                        .map(|e| {
-                            let (v0, v1) = e.vertices(mesh);
-                            let z = (points[v0.index() as usize].z + points[v1.index() as usize].z)
-                                * 0.5;
-                            let z = (z - zmin) / (zmax - zmin);
-                            let color = f32::round(z * 255.0) as u8;
-                            Srgba::new_opaque(255, color, 255 - color)
-                        })
-                        .collect(),
-                ),
                 ..Default::default()
             },
             Instances {
@@ -104,10 +89,12 @@ fn visualize_mesh(
             },
         )
     };
-    let mut wireframe_material = PhysicalMaterial::new_transparent(
+    let mut wireframe_material = PhysicalMaterial::new_opaque(
         &context,
         &CpuMaterial {
-            albedo: Srgba::WHITE,
+            albedo: Srgba::new_opaque(220, 50, 50),
+            roughness: 0.7,
+            metallic: 0.8,
             ..Default::default()
         },
     );
