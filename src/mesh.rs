@@ -1,6 +1,7 @@
 use alum::{
-    Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor, FloatScalarAdaptor, PolyMeshT,
-    QuadricDecimater, VectorAngleAdaptor, VectorLengthAdaptor, VectorNormalizeAdaptor,
+    decimate::quadric::QuadricType, Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor,
+    FloatScalarAdaptor, PolyMeshT, QuadricDecimater, VectorAngleAdaptor, VectorLengthAdaptor,
+    VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
 
@@ -74,7 +75,8 @@ pub struct ExperimentDecimater {
 impl ExperimentDecimater {
     pub fn new(mesh: &PolyMesh) -> Self {
         ExperimentDecimater {
-            inner: QuadricDecimater::new(mesh).expect("Cannot create quadric decimater"),
+            inner: QuadricDecimater::new(mesh, QuadricType::ProbabilisticTriangle)
+                .expect("Cannot create quadric decimater"),
             history: Vec::new(),
         }
     }
