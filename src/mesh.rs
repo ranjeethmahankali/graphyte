@@ -1,6 +1,6 @@
+use alum::DotProductAdaptor;
 use alum::{
-    decimate::quadric::QuadricType, Adaptor, CrossProductAdaptor, Decimater, DotProductAdaptor,
-    FloatScalarAdaptor, HasTopology, PolyMeshT, QuadricDecimater, VectorAngleAdaptor,
+    Adaptor, CrossProductAdaptor, FloatScalarAdaptor, PolyMeshT, VectorAngleAdaptor,
     VectorLengthAdaptor, VectorNormalizeAdaptor,
 };
 use three_d::{InnerSpace, Vec3};
@@ -66,47 +66,6 @@ impl VectorAngleAdaptor for MeshAdaptor {
 }
 
 pub type PolyMesh = PolyMeshT<3, MeshAdaptor>;
-
-pub struct ExperimentDecimater {
-    inner: QuadricDecimater<MeshAdaptor>,
-    history: Vec<PolyMesh>,
-}
-
-impl ExperimentDecimater {
-    pub fn new(mesh: &PolyMesh) -> Self {
-        ExperimentDecimater {
-            inner: QuadricDecimater::new(mesh, QuadricType::ProbabilisticTriangle)
-                .expect("Cannot create quadric decimater"),
-            history: Vec::new(),
-        }
-    }
-
-    pub fn history(&self) -> &[PolyMesh] {
-        &self.history
-    }
-}
-
-impl Decimater<PolyMesh> for ExperimentDecimater {
-    type Cost = f32;
-
-    fn collapse_cost(&self, mesh: &PolyMesh, h: alum::HH) -> Option<Self::Cost> {
-        self.inner.collapse_cost(mesh, h)
-    }
-
-    fn before_collapse(&mut self, mesh: &PolyMesh, h: alum::HH) -> Result<(), alum::Error> {
-        self.inner.before_collapse(mesh, h)?;
-        Ok(())
-    }
-
-    fn after_collapse(&mut self, mesh: &PolyMesh, v: alum::VH) -> Result<(), alum::Error> {
-        self.inner.after_collapse(mesh, v)?;
-        let mut copy = mesh.clone();
-        copy.garbage_collection()?;
-        copy.check_topology()?;
-        self.history.push(copy);
-        Ok(())
-    }
-}
 
 #[cfg(test)]
 mod test {

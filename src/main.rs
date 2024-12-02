@@ -1,19 +1,21 @@
 mod mesh;
 mod scene;
 
-use alum::{Handle, HasDecimation, HasIterators, HasTopology};
-use mesh::{ExperimentDecimater, PolyMesh};
+use alum::{Handle, HasIterators, HasTopology};
+use mesh::PolyMesh;
 use scene::CameraMouseControl;
-use std::{path::PathBuf, time::Instant};
+use std::path::PathBuf;
 use three_d::{
     degrees, vec3, AmbientLight, Camera, ClearState, Context, CpuMaterial, CpuMesh, Cull,
-    DirectionalLight, Event, FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Key,
-    Mat4, Mesh, PhysicalMaterial, Positions, Quat, Srgba, Window, WindowSettings,
+    DirectionalLight, FrameOutput, Gm, Indices, InnerSpace, InstancedMesh, Instances, Mat4, Mesh,
+    PhysicalMaterial, Positions, Quat, Srgba, Window, WindowSettings,
 };
 
 fn bunny_mesh() -> PolyMesh {
-    let mesh = PolyMesh::load_obj(&PathBuf::from("/home/rnjth94/dev/alum/assets/bunny.obj"))
-        .expect("Cannot load obj");
+    let mesh = PolyMesh::load_obj(&PathBuf::from(
+        "/home/rnjth94/dev/alum/assets/bunny_quad.obj",
+    ))
+    .expect("Cannot load obj");
     {
         let mut points = mesh.points();
         let mut points = points.try_borrow_mut().expect("Cannot borrow points");
@@ -32,8 +34,8 @@ fn visualize_mesh(
     Gm<InstancedMesh, PhysicalMaterial>,
     Gm<InstancedMesh, PhysicalMaterial>,
 ) {
-    const CYL_RADIUS: f32 = 0.0005;
-    const SPH_RADIUS: f32 = 0.001;
+    const CYL_RADIUS: f32 = 0.005;
+    const SPH_RADIUS: f32 = 0.01;
     // Create a CPU-side mesh consisting of a single colored triangle
     let (model, etransforms, vtransforms) = {
         let points = mesh.points();
@@ -124,7 +126,7 @@ pub fn main() {
     })
     .unwrap();
     let context = window.gl();
-    let mut mesh = {
+    let mesh = {
         let mut mesh = bunny_mesh();
         mesh.update_face_normals()
             .expect("Cannot update face normals");
@@ -133,16 +135,6 @@ pub fn main() {
         mesh.check_topology().expect("Topological errors found");
         mesh
     };
-    let mut decimater = ExperimentDecimater::new(&mesh);
-    const NUM_COLLAPSES: usize = 3000;
-    let before = Instant::now();
-    mesh.decimate(&mut decimater, NUM_COLLAPSES)
-        .expect("Cannot decimate");
-    println!(
-        "Decimation took {}ms",
-        (Instant::now() - before).as_millis()
-    );
-    let history = decimater.history();
     let target = vec3(0.0, 1.0, 0.0);
     let scene_radius: f32 = 6.0;
     let mut camera = Camera::new_perspective(
@@ -156,53 +148,23 @@ pub fn main() {
     );
     let mut control =
         CameraMouseControl::new(*camera.target(), 0.1 * scene_radius, 100.0 * scene_radius);
-    let views: Vec<(
-        Gm<Mesh, PhysicalMaterial>,
-        Gm<InstancedMesh, PhysicalMaterial>,
-        Gm<InstancedMesh, PhysicalMaterial>,
-    )> = history
-        .iter()
-        .map(|mesh| visualize_mesh(&mesh, &context))
-        .collect();
+    let (model, vertices, edges) = visualize_mesh(&mesh, &context);
     // let (_, rvs, res) = visualize_mesh(&refbox, &context);
     let ambient = AmbientLight::new(&context, 0.7, Srgba::WHITE);
     let directional0 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(-1.0, -1.0, -1.0));
     let directional1 = DirectionalLight::new(&context, 2.0, Srgba::WHITE, &vec3(1.0, 1.0, 1.0));
-    let mut index = 0usize;
     // render loop
     window.render_loop(move |mut frame_input| {
         let mut redraw = frame_input.first_frame;
         redraw |= camera.set_viewport(frame_input.viewport);
         redraw |= control.handle_events(&mut camera, &mut frame_input.events);
-        for event in &frame_input.events {
-            let next = usize::clamp(
-                match event {
-                    Event::KeyPress { kind, .. } => match kind {
-                        Key::ArrowDown => index + 1,
-                        Key::ArrowUp => index.saturating_sub(1),
-                        Key::R => 0,
-                        Key::PageUp => index.saturating_sub(10),
-                        Key::PageDown => index + 10,
-                        _ => index,
-                    },
-                    _ => index,
-                },
-                0,
-                views.len() - 1,
-            );
-            if next != index {
-                redraw = true;
-                index = next;
-            }
-        }
-        let (model, vertices, edges) = &views[index];
         if redraw {
             frame_input
                 .screen()
                 .clear(ClearState::color_and_depth(0.1, 0.1, 0.1, 1.0, 1.0))
                 .render(
                     &camera,
-                    model.into_iter().chain(vertices).chain(edges),
+                    model.into_iter().chain(&vertices).chain(&edges),
                     &[&ambient, &directional0, &directional1],
                 );
         }
